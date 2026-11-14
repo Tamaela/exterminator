@@ -164,3 +164,10 @@ code { font-family: ui-monospace, monospace; font-size: 0.92em; }
 }
 .confirm p { margin: 0 0 8px; }
 .log li.error span { color: var(--error); }
+
+/* A protected site in the popup status: switches to its tab. */
+button.site-link {
+  background: none; border: none; padding: 0; font: inherit; color: inherit;
+  text-decoration: underline; text-underline-offset: 2px; cursor: pointer;
+}
+button.site-link:hover { filter: none; text-decoration-thickness: 2px; }

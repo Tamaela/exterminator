@@ -251,9 +251,6 @@
   "pausedStatus": {
     "message": "⏸ Paused for {sites} (at most one hour). Leaving these sites or opening another protected site ends the pause."
   },
-  "activeStatus": {
-    "message": "Protected mode active ({sites})"
-  },
   "disabledCount": {
     "message": "{count} extension(s) temporarily turned off:"
   },
@@ -481,5 +478,11 @@
   },
   "allowAgainUnavailable": {
     "message": "Created by an older version: review it and turn it back on in the lists below."
+  },
+  "activeStatusLabel": {
+    "message": "Protected mode active:"
+  },
+  "goToSite": {
+    "message": "Go to this tab"
   }
 }

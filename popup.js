@@ -1,8 +1,8 @@
 import { t, localizePage } from './lib/i18n.js';
-import { suggestDomain } from './lib/domains.js';
-import { describeTab } from './lib/planner.js';
+import { suggestDomain, matchSite } from './lib/domains.js';
+import { describeTab, siteForTab } from './lib/planner.js';
 import { riskOf, permissionSnapshot } from './lib/risk.js';
-import { KEYS, getSettings, getState, isPaused, setPaused, pauseFor, getAlerts, getFlaggedTabs, actions } from './lib/storage.js';
+import { KEYS, getSettings, getState, isPaused, setPaused, pauseFor, getAlerts, getFlaggedTabs, getFramedTabs, actions } from './lib/storage.js';
 import { el, readDomain, onStorageChange } from './lib/ui.js';
 
 localizePage();
@@ -86,6 +86,31 @@ function allowButton(ext) {
   return btn;
 }
 
+// Switches to a tab that shows this protected site (in any window). With several tabs of the
+// same site, each click goes to the next one. Tabs where it is only an iframe come last.
+async function goToSite(domain) {
+  const [settings, flagged, framed, tabs] = await Promise.all([
+    getSettings(), getFlaggedTabs(), getFramedTabs(), chrome.tabs.query({}),
+  ]);
+  const own = tabs.filter((x) => siteForTab(x.url, x.id, settings, flagged)?.domain === domain);
+  const viaFrame = tabs.filter((x) => !own.includes(x)
+    && (framed[x.id] || []).some((host) => matchSite(host, settings.sites)?.domain === domain));
+  const candidates = [...own, ...viaFrame];
+  if (!candidates.length) return;
+  const current = candidates.findIndex((x) => x.id === tab?.id);
+  const target = candidates[(current + 1) % candidates.length];
+  await chrome.tabs.update(target.id, { active: true });
+  await chrome.windows.update(target.windowId, { focused: true });
+  window.close();
+}
+
+function siteLinks(domains) {
+  return domains.flatMap((domain, i) => [
+    i > 0 && ', ',
+    el('button', { className: 'site-link', textContent: domain, title: t('goToSite'), onclick: () => goToSite(domain) }),
+  ]).filter(Boolean);
+}
+
 function renderStatus(paused, state, byId) {
   statusEl.replaceChildren();
   if (paused) {
@@ -93,7 +118,7 @@ function renderStatus(paused, state, byId) {
   } else if (state.activeSites.length) {
     const ids = state.disabledByUs;
     statusEl.append(
-      el('p', { className: 'ok', textContent: t('activeStatus', { sites: state.activeSites.join(', ') }) }),
+      el('p', { className: 'ok' }, t('activeStatusLabel'), ' ', ...siteLinks(state.activeSites)),
       el('p', { textContent: ids.length ? t('disabledCount', { count: ids.length }) : t('disabledNone') }),
     );
     if (ids.length) {
