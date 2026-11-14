@@ -69,12 +69,17 @@ input[type="text"] {
 .toggle input { margin-top: 4px; }
 
 /* Popup */
-body.popup { width: 320px; padding: 12px; }
+body.popup { width: 480px; padding: 12px 12px 0; }
 .popup header { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
 .popup header img { width: 20px; height: 20px; }
 .popup section { border-top: 1px solid var(--border); padding: 10px 0; }
 .popup .host { font-family: ui-monospace, monospace; font-size: 13px; word-break: break-all; }
-.popup footer { display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--border); padding-top: 10px; }
+.popup footer {
+  display: flex; justify-content: space-between; align-items: center;
+  border-top: 1px solid var(--border); padding: 10px 0 12px;
+  /* Pause and settings stay in view when the popup scrolls. */
+  position: sticky; bottom: 0; background: var(--bg);
+}
 .popup a { color: var(--accent); }
 .disabled-list { list-style: none; padding: 0; }
 .disabled-list li { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 3px 0; }
