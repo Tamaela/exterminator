@@ -4,7 +4,7 @@ import { describeTab, siteForTab, wholeSites } from './lib/planner.js';
 import { riskOf, permissionSnapshot } from './lib/risk.js';
 import {
   KEYS, getSettings, getState, isPaused, setPaused, pauseFor, getAlerts, getFlaggedTabs, getFramedTabs, actions,
-  getAsks,
+  getAsks, hasConsent,
 } from './lib/storage.js';
 import { el, readDomain, onStorageChange } from './lib/ui.js';
 import { levelPicker, askCards, levelsFor } from './lib/levels.js';
@@ -24,9 +24,13 @@ const incognitoAllowed = await chrome.extension.isAllowedIncognitoAccess();
 const onDisk = await fetch(chrome.runtime.getURL('manifest.json')).then((r) => r.json()).catch(() => null);
 const stale = onDisk && onDisk.version !== chrome.runtime.getManifest().version;
 
-function renderWarnings(alerts) {
+// Banners at the top: setup not finished, an old version still loaded, no incognito access,
+// open permission alerts.
+function renderWarnings(alerts, consent) {
+  const setup = !consent && el('p', { className: 'banner' }, t('popupSetup'), ' ',
+    el('button', { className: 'secondary small', textContent: t('popupSetupButton'), onclick: () => chrome.tabs.create({ url: 'welcome.html' }) }));
   // replaceChildren() would show `false` as text, so the conditions are filtered out first.
-  warnEl.replaceChildren(...[
+  warnEl.replaceChildren(...[setup].filter(Boolean), ...[
     stale && t('popupReload', { version: onDisk.version }),
     !incognitoAllowed && t('popupIncognito'),
     alerts.length > 0 && t('popupAlerts', { count: alerts.length }),
@@ -163,10 +167,10 @@ function renderStatus(paused, state, byId) {
 }
 
 async function render() {
-  const [settings, state, paused, exts, flaggedTabs, alerts, asks] = await Promise.all([
-    getSettings(), getState(), isPaused(), chrome.management.getAll(), getFlaggedTabs(), getAlerts(), getAsks(),
+  const [settings, state, paused, exts, flaggedTabs, alerts, asks, consent] = await Promise.all([
+    getSettings(), getState(), isPaused(), chrome.management.getAll(), getFlaggedTabs(), getAlerts(), getAsks(), hasConsent(),
   ]);
-  renderWarnings(alerts);
+  renderWarnings(alerts, consent);
   renderAsks(asks, settings);
   renderSite(settings, flaggedTabs);
   renderStatus(paused, state, new Map(exts.map((e) => [e.id, e])));
@@ -180,6 +184,6 @@ document.getElementById('open-options').addEventListener('click', (e) => {
   e.preventDefault();
   chrome.runtime.openOptionsPage();
 });
-onStorageChange([KEYS.settings, KEYS.state, KEYS.paused, KEYS.flaggedTabs, KEYS.alerts, KEYS.asks], render);
+onStorageChange([KEYS.settings, KEYS.state, KEYS.paused, KEYS.flaggedTabs, KEYS.alerts, KEYS.asks, KEYS.consent], render);
 
 render();

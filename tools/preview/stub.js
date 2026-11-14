@@ -2,6 +2,7 @@
 //   detected: a login page with an open question and 16 extensions turned off
 //   strict:   a Strict site with 16 extensions turned off
 //   idle:     an unprotected page
+//   setup:    before you agreed on the welcome page
 (() => {
   const read = (path) => {
     const request = new XMLHttpRequest();
@@ -27,15 +28,20 @@
   const data = {
     detected: {
       url: 'https://forum.example/login',
-      local: { settings: { ...base, sites: [] }, state: { activeSites: ['forum.example'], disabledByUs: ids }, asks: { 'forum.example': 1 } },
+      local: { consent: true, settings: { ...base, sites: [] }, state: { activeSites: ['forum.example'], disabledByUs: ids }, asks: { 'forum.example': 1 } },
       session: { flaggedTabs: { 1: 'forum.example' } },
     },
     strict: {
       url: 'https://bank.example/',
-      local: { settings: { ...base, sites: [{ domain: 'bank.example', extra: [], level: 'strict' }] }, state: { activeSites: ['bank.example'], disabledByUs: ids } },
+      local: { consent: true, settings: { ...base, sites: [{ domain: 'bank.example', extra: [], level: 'strict' }] }, state: { activeSites: ['bank.example'], disabledByUs: ids } },
       session: {},
     },
     idle: {
+      url: 'https://news.example/',
+      local: { consent: true, settings: { ...base, sites: [] }, state: { activeSites: [], disabledByUs: [] } },
+      session: {},
+    },
+    setup: {
       url: 'https://news.example/',
       local: { settings: { ...base, sites: [] }, state: { activeSites: [], disabledByUs: [] } },
       session: {},
@@ -53,7 +59,7 @@
   const noEvents = { addListener() {} };
   window.chrome = {
     i18n: { getMessage: (key) => messages[key]?.message || '' },
-    tabs: { query: async () => [{ id: 1, url: data.url, windowId: 1 }], update: async () => {} },
+    tabs: { query: async () => [{ id: 1, url: data.url, windowId: 1 }], update: async () => {}, create: async () => {} },
     windows: { update: async () => {} },
     extension: { isAllowedIncognitoAccess: async () => true },
     runtime: { id: 'self', getURL: (path) => path, getManifest: () => ({ version }), openOptionsPage() {} },

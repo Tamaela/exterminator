@@ -8,5 +8,6 @@ mkdir -p dist
 rm -f "dist/exterminator-$VERSION.zip"
 zip -qr "dist/exterminator-$VERSION.zip" manifest.json _locales icons lib \
   background.js detector.js detector-extended.js offscreen.html offscreen.js \
+  welcome.html welcome.js \
   popup.html popup.js options.html options.js styles.css -x '*.DS_Store'
 echo "dist/exterminator-$VERSION.zip"

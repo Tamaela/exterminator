@@ -8,7 +8,7 @@ import {
   KEYS, migrate, getSettings, isPaused, setPaused, getState, setState,
   getAlerts, setAlerts, getApprovals, setApprovals, addLog, actions,
   getTabData, setTabData, getFlaggedTabs, getFramedTabs,
-  isBooted, markBooted, isUpdatePending, markUpdatePending, getAsks, setAsks, openAsks,
+  isBooted, markBooted, isUpdatePending, markUpdatePending, getAsks, setAsks, openAsks, hasConsent,
 } from './lib/storage.js';
 
 // Grace period before extensions come back or a site is cleaned up, so that
@@ -337,6 +337,7 @@ async function setBadge({ mode, count, ask }) {
     on: { text: 'ON', color: '#1a7f37', title: t('badgeOnTitle', { count }) },
     pause: { text: 'II', color: '#9a6700', title: t('badgePausedTitle') },
     ask: { text: '?', color: '#bc4c00', title: t('badgeAskTitle') },
+    setup: { text: '!', color: '#bc4c00', title: t('badgeSetupTitle') },
     off: { text: '', color: '#1a7f37', title: t('extName') },
   }[mode];
   await chrome.action.setBadgeText({ text: cfg.text });
@@ -356,6 +357,12 @@ async function syncFastAudit(active) {
 let updatePending = false;
 
 async function evaluate(opts = {}) {
+  // Before you agree on the welcome page, nothing is turned off (Chrome Web Store policy:
+  // changes to your setup need your knowledge and consent).
+  if (!(await hasConsent())) {
+    await setBadge({ mode: 'setup', count: 0 });
+    return { reloadTabIds: [], restartNavigation: null, frameRace: [], state: await getState(), settings: await getSettings() };
+  }
   try {
     await reconcileApprovals(await chrome.management.getAll());
   } catch (err) {
@@ -609,7 +616,7 @@ chrome.storage.onChanged.addListener((changes, area) => {
   if (changes[KEYS.settings]) {
     run(async () => syncDetector(await getSettings()));
   }
-  if (changes[KEYS.settings] || changes[KEYS.paused] || changes[KEYS.asks]) requestCheck();
+  if (changes[KEYS.settings] || changes[KEYS.paused] || changes[KEYS.asks] || changes[KEYS.consent]) requestCheck();
 });
 
 // Website access revoked in chrome://extensions: turn detection off.
@@ -637,6 +644,12 @@ chrome.notifications.onClicked.addListener((id) => {
 chrome.notifications.onButtonClicked.addListener((id) => {
   if (id === NOTIFY.intrusion) run(reloadAllProtectedTabs);
   if (id.startsWith(NOTIFY.frame)) run(() => reloadTab(Number(id.slice(NOTIFY.frame.length))));
+});
+
+// A fresh install opens the welcome page, which explains what Exterminator changes and asks
+// for consent.
+chrome.runtime.onInstalled.addListener(({ reason }) => {
+  if (reason === 'install') chrome.tabs.create({ url: 'welcome.html' });
 });
 
 chrome.runtime.onUpdateAvailable.addListener(() => {

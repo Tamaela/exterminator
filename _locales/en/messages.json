@@ -538,5 +538,59 @@
   },
   "logStaleTab": {
     "message": "A popup or generated page of {site} was open while other extensions were on. Reopen it."
+  },
+  "welcomeTitle": {
+    "message": "Welcome to Exterminator"
+  },
+  "welcomeWhatHeading": {
+    "message": "What Exterminator changes"
+  },
+  "welcomeWhat1": {
+    "message": "On websites you choose, such as your bank, Exterminator turns off your other extensions. It turns them back on when you leave."
+  },
+  "welcomeWhat2": {
+    "message": "You choose which extensions stay on, such as your password manager."
+  },
+  "welcomeWhat3": {
+    "message": "For sites with the level Strict, Exterminator logs you out when you leave. It clears the site's cookies, the site data and the clipboard."
+  },
+  "welcomeWhat4": {
+    "message": "Automatic protection is optional. It turns extensions off on any page with a password, code or payment field. Chrome asks for access to all websites when you turn it on."
+  },
+  "welcomeDataHeading": {
+    "message": "Your data"
+  },
+  "welcomeData1": {
+    "message": "Everything stays in your browser. Exterminator sends no data anywhere and has no analytics."
+  },
+  "welcomeData2": {
+    "message": "Automatic protection only checks whether a page has such a field. It does not read what you type or what the page shows."
+  },
+  "welcomeNoteHeading": {
+    "message": "Good to know"
+  },
+  "welcomeNote1": {
+    "message": "If you turn Exterminator off or remove it while a protected site is open, your other extensions stay off. Turn them back on in chrome://extensions."
+  },
+  "welcomeNote2": {
+    "message": "Nothing is turned off until you agree below."
+  },
+  "welcomeAgree": {
+    "message": "I understand, turn on Exterminator"
+  },
+  "welcomeAgreed": {
+    "message": "✓ Exterminator is on. Add your first protected site in the settings."
+  },
+  "welcomeOpenSettings": {
+    "message": "Open settings"
+  },
+  "badgeSetupTitle": {
+    "message": "Exterminator: finish setup to turn on protection"
+  },
+  "popupSetup": {
+    "message": "Exterminator is not on yet. Open the welcome page to turn it on."
+  },
+  "popupSetupButton": {
+    "message": "Open welcome page"
   }
 }

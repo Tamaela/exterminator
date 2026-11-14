@@ -194,3 +194,8 @@ button.site-link:hover { filter: none; text-decoration-thickness: 2px; }
 .ask-card button.level-choice span { display: block; font-size: 12px; opacity: 0.85; }
 .ask-card button.danger { margin-top: 4px; }
 .popup #asks:not([hidden]) { padding-bottom: 0; }
+
+/* Welcome page */
+.welcome-list { padding-left: 20px; }
+.welcome-list li { margin: 6px 0; }
+#consent button { margin-right: 8px; }

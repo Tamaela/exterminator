@@ -1,7 +1,7 @@
 import './chrome-stub.js';
 import { test, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { migrate, getSettings, isPaused, pauseFor, getState, actions, addLog, getLog, logText, normalizeSettings, LOG_MAX, SCHEMA_VERSION, getAsks, setAsks, openAsks } from '../lib/storage.js';
+import { migrate, getSettings, isPaused, pauseFor, getState, actions, addLog, getLog, logText, normalizeSettings, LOG_MAX, SCHEMA_VERSION, getAsks, setAsks, openAsks, hasConsent, giveConsent } from '../lib/storage.js';
 import { PAUSE_MAX_MS } from '../lib/planner.js';
 
 beforeEach(() => {
@@ -48,6 +48,17 @@ test('v4 data: the cleanup flag and the login-only list become a level per site'
   assert.equal('loginOnly' in settings, false);
   const { settings: stored } = await chrome.storage.local.get('settings');
   assert.equal('cleanup' in stored.sites[0], false);
+});
+
+test('consent: existing users count as agreed, a fresh install must agree first', async () => {
+  chrome.storage.local.reset({ schemaVersion: 5, settings: { sites: [] } });
+  await migrate();
+  assert.equal(await hasConsent(), true);
+  chrome.storage.local.reset();
+  await migrate();
+  assert.equal(await hasConsent(), false);
+  await giveConsent();
+  assert.equal(await hasConsent(), true);
 });
 
 test('actions update settings without duplicates', async () => {
