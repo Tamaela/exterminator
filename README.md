@@ -1,107 +1,84 @@
 # Exterminator
 
-A Chrome extension that turns off your other extensions on sensitive websites — your bank,
-tax office, anything you choose — and turns them back on when you leave. Extensions can read
-everything on the pages they run on, including passwords and form data; Exterminator makes
-sure only the ones you trust are running there.
+Exterminator is a Chrome extension. It turns off your other extensions while a sensitive website is open, such as your bank or your tax office. It turns them back on when you leave.
+
+An extension can read everything on the pages it runs on. That includes passwords and form data. Exterminator lets only the extensions you trust run on the sites you choose.
 
 ## Features
 
-- **Protected sites** — add a site from the toolbar icon or the settings. Subdomains count too.
-  Protected mode stays active as long as a tab of a protected site is open anywhere.
-- **Always on** — extensions (like your password manager) that stay on everywhere. Per site you
-  can allow extra extensions; with several protected sites open, only extensions allowed on all
-  of them stay on. Newly installed extensions are off by default.
-- **Automatic protection** *(optional)* — protect any page with a password field, even hidden
-  ones or ones inside (open) Shadow DOM. Optionally also credit card, CVC, 2FA, IBAN and national
-  ID fields. With exceptions for sites where you don't want this.
-- **Permission monitoring** — if an "Always on" extension gains new permissions in an update, it
-  is removed from the list until you re-approve it.
-- **Risk labels** — every extension gets a high / medium / low risk label based on its permissions.
-- **Intrusion alerts** — an extension turned on during protected mode is turned off again and you
-  get a notification offering to reload protected tabs.
-- **After leaving** *(optional)* — log out by clearing a site's cookies and data, and clear the clipboard.
-- **Activity log**, incognito warning, pause button. A pause covers only the protected sites open
-  when you press it, ends when you leave them or open another protected site, and lasts at most an hour.
+- You add a protected site from the toolbar icon or the settings page. Subdomains are protected too. Protected mode stays active while any tab of a protected site is open.
+- Extensions on the "Always on" list stay on everywhere. Use it for your password manager. Each site can allow extra extensions. With several protected sites open, an extra extension stays on only if every open site allows it. Newly installed extensions are off by default.
+- Automatic protection is optional. It protects any page with a password field. The field may be hidden or inside open or closed Shadow DOM. A second option adds credit card, CVC, 2FA, IBAN and national ID fields. You can exclude sites from automatic protection.
+- Exterminator checks the permissions of every allowed extension. An extension that gains new permissions in an update is removed from the lists until you approve it again.
+- Each extension gets a high, medium or low risk label based on its permissions.
+- An extension that is turned on during protected mode is turned off again. You get a notification with a button that reloads the protected tabs.
+- When you leave a site, Exterminator can log you out by clearing the site's cookies and data. It can also clear the clipboard. Both options are off by default.
+- The popup shows the protected sites that are open. Clicking a site switches to its tab.
+- The settings page keeps an activity log. The popup warns you when Exterminator has no incognito access.
+- The pause button applies to the protected sites that are open when you press it. The pause ends when you leave those sites or open another protected site. It lasts at most one hour.
 
 ## Install (developer mode)
 
 1. Open `chrome://extensions` and turn on **Developer mode**.
 2. Click **Load unpacked** and select this folder.
-3. Under **Details**, turn on **Allow in Incognito** — otherwise you're unprotected there.
+3. Under **Details**, turn on **Allow in Incognito**. Without it, incognito windows are not protected.
 
-Requires Chrome 120 or newer.
+Exterminator requires Chrome 120 or newer.
 
 ## How it works
 
-The background worker (`background.js`) listens to navigation and tab events, gathers the
-current situation and asks the pure planner (`lib/planner.js`) what should happen: which
-extensions to turn off or back on, which tabs to reload, what to clean up. It then applies
-that plan. Disabling an extension does not remove scripts it already injected into a page,
-so a tab that becomes protected is reloaded if it was loaded while those extensions were on.
+The service worker in `background.js` listens to navigation and tab events. It collects the open tabs, the installed extensions and the stored state. It passes these to the planner in `lib/planner.js`. The planner decides which extensions to turn off or on, which tabs to reload and which sites to clean up. The service worker then carries out that plan.
+
+Turning an extension off does not remove the scripts it already injected into a page. A tab that becomes protected is therefore reloaded if it loaded while those extensions were on.
 
 | Path | Purpose |
 |---|---|
-| `background.js` | Service worker: events, applying plans, permission monitoring |
-| `detector.js` | Optional content script that reports sensitive fields (never page content) |
-| `detector-extended.js` | Turns on extended field detection; registered only when that option is on |
-| `popup.*`, `options.*` | Toolbar popup and settings page |
-| `offscreen.*` | Hidden document used only to clear the clipboard |
-| `lib/planner.js` | Pure decision logic (fully unit tested) |
-| `lib/storage.js` | Storage keys, schema migrations, settings actions, activity log |
-| `lib/domains.js`, `lib/risk.js`, `lib/i18n.js`, `lib/ui.js` | Helpers |
-| `_locales/en/messages.json` | All user-facing text |
+| `background.js` | The service worker handles events, applies plans and checks permissions. |
+| `detector.js` | This optional content script reports that a page has a sensitive field. It never sends page content. |
+| `detector-extended.js` | This file turns on the extra field types. It is injected only when that option is on. |
+| `popup.*`, `options.*` | These files make up the toolbar popup and the settings page. |
+| `offscreen.*` | This hidden document clears the clipboard. |
+| `lib/planner.js` | The planner holds all decision logic. Unit tests cover it. |
+| `lib/storage.js` | This module defines storage keys, schema migrations, settings actions and the activity log. |
+| `lib/domains.js`, `lib/risk.js`, `lib/i18n.js`, `lib/ui.js` | These modules contain helper functions. |
+| `_locales/en/messages.json` | This file contains all text that users see. |
 
 ## Permissions
 
 | Permission | Why |
 |---|---|
-| `management` | Turn other extensions off and on |
-| `tabs`, `webNavigation` | Know which sites are open, react before a page loads |
-| `storage`, `alarms` | Settings, state and recovery after restarts |
-| `scripting` + optional website access | Only for automatic field detection, requested when you turn it on |
-| `browsingData` | "Log out when leaving" |
-| `offscreen` | Clearing the clipboard |
-| `notifications` | Permission and intrusion alerts |
+| `management` | Exterminator turns other extensions off and on. |
+| `tabs`, `webNavigation` | Exterminator reads which sites are open and reacts before a page loads. |
+| `storage`, `alarms` | Exterminator stores settings and state and recovers after a restart. |
+| `scripting` and optional website access | Automatic field detection uses these. Chrome asks for website access when you turn detection on. |
+| `browsingData` | "Log out when leaving" clears cookies and site data. |
+| `offscreen` | Exterminator clears the clipboard from a hidden document. |
+| `notifications` | Exterminator shows permission, intrusion and reload notifications. |
 
 ## Known limitations
 
-- Removing or disabling Exterminator while protected mode is active leaves the other
-  extensions off (Chrome runs no code on uninstall).
-- Restarting a navigation into a protected site turns a form POST into a GET.
-- Fields inside open and *closed* Shadow DOM are detected (extensions can read both, so the
-  detector looks at both). Web components that attach a shadow root long after the page loaded
-  are caught by late scans or when you focus the field.
-- Protection turns *other* extensions off, including protective ones such as an ad blocker. Put
-  extensions you rely on for safety on "Always on", otherwise a page that loads a protected site
-  in an iframe can turn them off for as long as it stays open.
-- "Log out when leaving" can't clear incognito data (Chrome doesn't allow it); the log says so.
-  Closing all incognito windows removes it.
-- "Log out when leaving" only applies to sites you opened as a page yourself: a site that was
-  only embedded in an iframe or prerendered by another page is never logged out. When you leave
-  such a site for another protected site, extensions that site allows come back only after the
-  logout (and clipboard clearing) has run.
-- Popups and generated pages (about:blank, blob:) of a protected site are protected but can't be
-  reloaded; if they were open while other extensions were on, you get a notification to reopen them.
-- "Allow again" on an alert created by version 0.5.0 or older is not possible (it doesn't record
-  which permissions you saw); review the extension and turn it back on in the lists.
-- Apps are turned off like extensions; themes are left alone (they can't run code).
-- If Chrome can't keep Exterminator's settings out of reach of web pages, automatic field
-  detection stays off and you get a notification; configured sites are still protected.
-- An update of Exterminator waits until protected mode is off.
-- An "Always on" extension is fully trusted on protected pages.
-- A protected site inside an iframe turns protection on as soon as the frame starts loading.
-  The frame is not reloaded automatically (it may be a payment step); if it loaded before
-  extensions were off, you get a notification with a reload button.
-- An extension with the `management` permission could turn Exterminator itself off; Chrome offers
-  no way to prevent or detect that from inside the extension.
-- Without "Allow in Incognito", protection does not apply in incognito windows.
+- Chrome runs no extension code on uninstall. If you remove or disable Exterminator during protected mode, the other extensions stay off.
+- Exterminator restarts a navigation into a protected site. A form POST becomes a GET when that happens.
+- Web components can attach a shadow root long after the page loaded. Late scans at 1, 3 and 10 seconds find such fields. Focusing the field also triggers detection.
+- Protection also turns off protective extensions, such as an ad blocker. A page that loads a protected site in an iframe keeps them off for as long as it stays open. Put extensions you rely on for safety on "Always on".
+- Chrome does not let extensions clear incognito data. The activity log records each incognito site that was not cleared. Closing all incognito windows removes that data.
+- "Log out when leaving" applies only to sites you opened as a page. A site that another page embedded in an iframe or prerendered is not logged out.
+- When you leave a site with "Log out when leaving" for another protected site, its extensions come back after the logout and the clipboard clearing have run.
+- Popups and generated pages (about:blank, blob:) of a protected site are protected. Exterminator cannot reload them. If one was open while other extensions were on, a notification asks you to reopen it.
+- Alerts created by version 0.5.0 or older did not record which permissions you saw. "Allow again" is unavailable for them. Review the extension and turn it back on in the lists.
+- Apps are turned off like extensions. Themes stay on because they cannot run code.
+- Chrome may refuse to shield Exterminator's settings from web pages. Automatic field detection then stays off and a notification tells you. Configured sites stay protected.
+- Exterminator installs its own updates after protected mode ends.
+- An "Always on" extension has full access to protected pages.
+- A protected site inside an iframe turns protection on when the frame starts loading. Exterminator does not reload the frame, because it may be a payment step. If the frame loaded before the extensions were off, a notification offers to reload the page.
+- An extension with the `management` permission can turn Exterminator off. Chrome gives an extension no way to block or detect that.
+- Without "Allow in Incognito", incognito windows are not protected.
 
 ## Development
 
 ```sh
-npm install   # jsdom, for the detector tests
-npm test      # 51 tests: planner, storage/migrations, domains, risk, i18n, UI helpers, detector
-npm run icons # regenerate icons/ (Python 3, no dependencies)
-npm run package # dist/exterminator-<version>.zip without dev files
+npm install     # installs jsdom for the detector tests
+npm test        # runs 75 tests for the planner, storage, domains, risk labels, i18n, UI helpers and detector
+npm run icons   # regenerates icons/ with Python 3
+npm run package # builds dist/exterminator-<version>.zip without development files
 ```
