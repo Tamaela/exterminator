@@ -2,6 +2,7 @@
   "name": "tab-chaperone",
   "private": true,
   "description": "Chrome extension that disables other extensions on sensitive websites.",
+  "author": "Sander Tamaela",
   "license": "MIT",
   "type": "module",
   "scripts": {

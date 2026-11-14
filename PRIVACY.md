@@ -2,7 +2,7 @@
 
 Last updated: 15 November 2026
 
-Tab Chaperone is a Chrome extension. One person develops and publishes it. The source code is public at https://github.com/Tamaela/tab-chaperone.
+Tab Chaperone is a Chrome extension. Sander Tamaela develops and publishes it as a private person. The source code is public at https://github.com/Tamaela/tab-chaperone.
 
 ## What Tab Chaperone reads
 

@@ -66,7 +66,9 @@ This file holds the texts for the Chrome Web Store developer dashboard. Copy eac
 
 ## Account
 
-- Publish as an individual. Choose "non-trader" in the trader declaration.
+- Publisher name: Sander Tamaela.
+- Trader declaration: non-trader. Tab Chaperone is a free, open source project made as a private person, outside any business.
+- To stay a non-trader: no payments, ads, donations or in-app purchases, and no link to or mention of a business in the listing.
 - Contact: the GitHub issues page, https://github.com/Tamaela/tab-chaperone/issues.
 - The developer account needs two-step verification and a one-time registration fee.
 

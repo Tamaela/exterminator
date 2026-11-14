@@ -102,4 +102,4 @@ This section is for people who change the code. Using the extension requires onl
 
 ## License
 
-Tab Chaperone is released under the MIT License. The full text is in `LICENSE`.
+Tab Chaperone is made by Sander Tamaela and released under the MIT License. The full text is in `LICENSE`.
