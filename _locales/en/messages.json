@@ -544,5 +544,8 @@
   },
   "askAgain": {
     "message": "Ask again"
+  },
+  "popupReload": {
+    "message": "Version {version} is on disk but not loaded. Reload Exterminator in chrome://extensions."
   }
 }

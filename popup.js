@@ -19,9 +19,14 @@ const pauseBtn = document.getElementById('pause');
 
 const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
 const incognitoAllowed = await chrome.extension.isAllowedIncognitoAccess();
+// An unpacked extension reads its pages from disk on every open, but the service worker keeps
+// the code Chrome loaded. A newer manifest on disk means the extension was not reloaded.
+const onDisk = await fetch(chrome.runtime.getURL('manifest.json')).then((r) => r.json()).catch(() => null);
+const stale = onDisk && onDisk.version !== chrome.runtime.getManifest().version;
 
 function renderWarnings(alerts) {
   warnEl.replaceChildren(
+    stale && el('p', { className: 'banner', textContent: t('popupReload', { version: onDisk.version }) }),
     !incognitoAllowed && el('p', { className: 'banner', textContent: t('popupIncognito') }),
     alerts.length > 0 && el('p', { className: 'banner', textContent: t('popupAlerts', { count: alerts.length }) }),
   );
