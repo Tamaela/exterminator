@@ -52,7 +52,7 @@ Turning an extension off does not remove the scripts it already injected into a 
 | `storage`, `alarms` | Exterminator stores settings and state and recovers after a restart. |
 | `scripting` and optional website access | Automatic field detection uses these. Chrome asks for website access when you turn detection on. |
 | `browsingData` | "Log out when leaving" clears cookies and site data. |
-| `offscreen` | Exterminator clears the clipboard from a hidden document. |
+| `offscreen`, `clipboardWrite` | Exterminator clears the clipboard from a hidden document. Chrome requires `clipboardWrite` to do that without a click. |
 | `notifications` | Exterminator shows permission, intrusion and reload notifications. |
 
 ## Known limitations

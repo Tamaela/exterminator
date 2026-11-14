@@ -409,7 +409,8 @@ async function clearClipboard() {
     }
     const response = await withTimeout(chrome.runtime.sendMessage({ target: 'offscreen', type: 'clear-clipboard' }), 5000, 'clipboard');
     await chrome.offscreen.closeDocument().catch(() => {});
-    if (!response?.ok) throw new Error('copy command was rejected');
+    if (!response) throw new Error('the offscreen document did not answer');
+    if (!response.ok) throw new Error('Chrome rejected the copy command');
     await addLog({ type: 'clipboard' });
   } catch (err) {
     await logError('errClipboard', {}, err);
