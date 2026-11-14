@@ -1,15 +1,15 @@
 import { t, localizePage } from './lib/i18n.js';
 import { riskOf, describePermission, canManageExtensions, sortByRisk, permissionSnapshot } from './lib/risk.js';
 import {
-  KEYS, getSettings, getAlerts, getLog, clearLog, logText, actions, getAsks, openAsks, levelOf,
+  KEYS, getSettings, getAlerts, getLog, clearLog, logText, actions, getAsks, levelOf,
 } from './lib/storage.js';
 import { el, readDomain, onStorageChange } from './lib/ui.js';
-import { levelPicker, askCard } from './lib/levels.js';
+import { levelPicker, askCards } from './lib/levels.js';
+import { DETECTOR_ORIGINS } from './lib/detection.js';
 
 localizePage();
 
 const $ = (id) => document.getElementById(id);
-const DETECTOR_ORIGINS = ['http://*/*', 'https://*/*'];
 const SORT_KEY = 'exterminator-sort';
 
 // Sort preference is a per-viewer convenience, so localStorage is fine.
@@ -121,9 +121,8 @@ function renderLoginOnly(settings) {
 }
 
 function renderAsks(asks, settings) {
-  const open = openAsks(asks, settings);
-  $('asks-card').hidden = !open.length;
-  $('asks').replaceChildren(...open.map(askCard));
+  $('asks').replaceChildren(...askCards(asks, settings));
+  $('asks-card').hidden = !$('asks').childElementCount;
 }
 
 function renderLog(log) {

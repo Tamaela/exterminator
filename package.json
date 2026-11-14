@@ -1,6 +1,5 @@
 {
   "name": "exterminator",
-  "version": "0.9.4",
   "private": true,
   "description": "Chrome extension that disables other extensions on sensitive websites.",
   "license": "MIT",

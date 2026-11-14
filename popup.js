@@ -4,10 +4,10 @@ import { describeTab, siteForTab } from './lib/planner.js';
 import { riskOf, permissionSnapshot } from './lib/risk.js';
 import {
   KEYS, getSettings, getState, isPaused, setPaused, pauseFor, getAlerts, getFlaggedTabs, getFramedTabs, actions,
-  getAsks, openAsks, levelOf,
+  getAsks, levelOf,
 } from './lib/storage.js';
 import { el, readDomain, onStorageChange } from './lib/ui.js';
-import { levelPicker, askCard } from './lib/levels.js';
+import { levelPicker, askCards } from './lib/levels.js';
 
 localizePage();
 
@@ -36,9 +36,8 @@ function renderWarnings(alerts) {
 // Questions about detected sites; the one for the current tab comes first.
 function renderAsks(asks, settings) {
   const current = suggestDomain(describeTab(tab?.url, tab?.id, settings, {}).host || '');
-  const open = openAsks(asks, settings).sort((a, b) => (b === current) - (a === current));
-  askEl.replaceChildren(...open.map(askCard));
-  askEl.hidden = !open.length;
+  askEl.replaceChildren(...askCards(asks, settings, current));
+  askEl.hidden = !askEl.childElementCount;
 }
 
 function renderSite(settings, flaggedTabs) {

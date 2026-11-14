@@ -2,6 +2,7 @@ import { t } from './lib/i18n.js';
 import { hostOf, matchSite, suggestDomain } from './lib/domains.js';
 import { plan, siteForTab, describeTab, allowlistedIds } from './lib/planner.js';
 import { describePermission, permissionSnapshot } from './lib/risk.js';
+import { DETECTOR_ORIGINS, detectorFiles } from './lib/detection.js';
 import {
   KEYS, migrate, getSettings, isPaused, setPaused, getState, setState,
   getAlerts, setAlerts, getApprovals, setApprovals, addLog, actions,
@@ -20,7 +21,6 @@ const AUDIT_MINUTES = 30;
 // (permissions granted at runtime fire no event).
 const FAST_AUDIT_ALARM = 'exterminator-audit-active';
 const DETECTOR_ID = 'field-detector';
-const DETECTOR_ORIGINS = ['http://*/*', 'https://*/*'];
 const NOTIFY = { intrusion: 'intrusion', frame: 'frame-', stale: 'stale-', disableFailed: 'disable-failed', clipboard: 'clipboard-failed', ask: 'ask-' };
 const HISTORY_MAX = 20;
 
@@ -118,9 +118,7 @@ async function syncDetector(settings, { injectOpen = false } = {}) {
   const hasPermission = await chrome.permissions.contains({ origins: DETECTOR_ORIGINS });
   if (settings.fieldDetection && hasPermission && !storageRestricted) await warnStorageUnrestricted();
   const want = settings.fieldDetection && hasPermission && storageRestricted;
-  // The extended mode is passed as a separate file instead of via chrome.storage, so the
-  // content script never needs storage access (see detector-extended.js).
-  const js = settings.sensitiveFields ? ['detector-extended.js', 'detector.js'] : ['detector.js'];
+  const js = detectorFiles(settings);
   const registered = await chrome.scripting.getRegisteredContentScripts();
   const stale = registered.filter((s) => s.id !== DETECTOR_ID).map((s) => s.id); // e.g. old ids
   if (stale.length) await chrome.scripting.unregisterContentScripts({ ids: stale });
@@ -218,7 +216,7 @@ async function recheckTab(tabId) {
   if (!(tabId in flagged)) return false;
   await unflagTab(tabId, flagged);
   const settings = await getSettings();
-  const js = settings.sensitiveFields ? ['detector-extended.js', 'detector.js'] : ['detector.js'];
+  const js = detectorFiles(settings);
   // Not awaited, like injectDetector: a tab that doesn't respond must not hold up the queue.
   withTimeout(chrome.scripting.executeScript({ target: { tabId, allFrames: true }, files: js }), 5000, 'recheck')
     .catch(() => {});
@@ -587,7 +585,7 @@ async function evaluate(opts = {}) {
   }
 
   for (const { tabId, domain } of p.staleTabs) {
-    await addLog({ type: 'frameRace', site: domain });
+    await addLog({ type: 'staleTab', site: domain });
     await notify(`${NOTIFY.stale}${tabId}`, { title: t('staleTabTitle'), message: t('staleTabMessage', { site: domain }) });
   }
 

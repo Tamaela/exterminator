@@ -547,5 +547,8 @@
   },
   "popupReload": {
     "message": "Version {version} is on disk but not loaded. Reload Exterminator in chrome://extensions."
+  },
+  "logStaleTab": {
+    "message": "A popup or generated page of {site} was open while other extensions were on. Reopen it."
   }
 }
