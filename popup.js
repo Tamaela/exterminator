@@ -25,11 +25,12 @@ const onDisk = await fetch(chrome.runtime.getURL('manifest.json')).then((r) => r
 const stale = onDisk && onDisk.version !== chrome.runtime.getManifest().version;
 
 function renderWarnings(alerts) {
-  warnEl.replaceChildren(
-    stale && el('p', { className: 'banner', textContent: t('popupReload', { version: onDisk.version }) }),
-    !incognitoAllowed && el('p', { className: 'banner', textContent: t('popupIncognito') }),
-    alerts.length > 0 && el('p', { className: 'banner', textContent: t('popupAlerts', { count: alerts.length }) }),
-  );
+  // replaceChildren() would show `false` as text, so the conditions are filtered out first.
+  warnEl.replaceChildren(...[
+    stale && t('popupReload', { version: onDisk.version }),
+    !incognitoAllowed && t('popupIncognito'),
+    alerts.length > 0 && t('popupAlerts', { count: alerts.length }),
+  ].filter(Boolean).map((text) => el('p', { className: 'banner', textContent: text })));
   warnEl.hidden = !warnEl.childElementCount;
 }
 

@@ -81,7 +81,7 @@ function extList(exts, { isChecked, onToggle, lock }) {
         el('span', { className: 'ext-info' },
           el('span', {}, ext.name, ' ', riskBadge(risk)),
           risk.level !== 'low' && el('span', { className: 'reasons', textContent: risk.reasons.join(' · ') }))),
-      notes.length > 0 && el('span', { className: 'note', textContent: notes.join(' · ') }),
+      notes.length > 0 ? el('span', { className: 'note', textContent: notes.join(' · ') }) : '', // append() would show `false`
     );
     return row;
   });

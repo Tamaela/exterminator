@@ -7,7 +7,8 @@
   "scripts": {
     "test": "node --test \"tests/**/*.test.js\"",
     "icons": "python3 tools/make-icons.py icons",
-    "package": "sh tools/package.sh"
+    "package": "sh tools/package.sh",
+    "preview": "python3 -m http.server 8766 --bind 127.0.0.1"
   },
   "devDependencies": {
     "jsdom": "24.1.3"

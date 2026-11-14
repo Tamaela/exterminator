@@ -95,6 +95,7 @@ This section is for people who change the code. Using the extension requires onl
 | `npm install` | It installs jsdom. The detector tests use jsdom to simulate a web page. | Once, before the first test run. |
 | `npm test` | It runs the automated tests. They check which extensions go off, how stored settings are migrated, and whether the detector finds sensitive fields. | After every code change. |
 | `npm run icons` | It regenerates the icons in `icons/` with Python 3. | When you change the icon design in `tools/make-icons.py`. |
+| `npm run preview` | It serves the project on http://127.0.0.1:8766. Open `tools/preview/popup.html?s=detected` (or `s=strict`, `s=idle`) or `tools/preview/options.html?s=strict` to see the popup or the settings page with fake data. | When you change the popup or the settings page. |
 | `npm run package` | It builds `dist/exterminator-<version>.zip`. The zip holds only the files the extension needs. Tests and tools are left out. | When you share the extension or upload it to the Chrome Web Store. |
 
 ## License

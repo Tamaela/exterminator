@@ -1,0 +1,12 @@
+<!doctype html>
+<!-- Shows the real popup.html with fake data, without Chrome. Run `npm run preview` and open
+     http://127.0.0.1:8766/tools/preview/popup.html?s=detected (or s=strict, s=idle). -->
+<meta charset="utf-8">
+<script src="stub.js"></script>
+<script>
+  const request = new XMLHttpRequest();
+  request.open('GET', '../../popup.html', false);
+  request.send();
+  // Load the popup's own files from the project root.
+  document.write(request.responseText.replace('<head>', '<head><base href="../../">'));
+</script>
