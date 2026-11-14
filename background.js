@@ -472,10 +472,19 @@ async function reloadTab(tabId, url) {
   }
 }
 
+// True when the tab still shows or loads the site of this navigation. Turning extensions off
+// takes a moment; if you went elsewhere in the meantime, restarting would take you back.
+async function stillHeadingTo({ tabId, url }) {
+  const tab = await chrome.tabs.get(tabId).catch(() => null);
+  return !!tab && hostOf(tab.pendingUrl || tab.url) === hostOf(url);
+}
+
 // Evaluates and then reloads the tabs the plan names.
 async function protect(opts = {}) {
   const p = await evaluate(opts);
-  if (p.restartNavigation) await reloadTab(p.restartNavigation.tabId, p.restartNavigation.url);
+  if (p.restartNavigation && await stillHeadingTo(p.restartNavigation)) {
+    await reloadTab(p.restartNavigation.tabId, p.restartNavigation.url);
+  }
   for (const tabId of p.reloadTabIds) await reloadTab(tabId);
   return p;
 }

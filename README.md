@@ -93,8 +93,9 @@ This section is for people who change the code. Using the extension requires onl
 
 | Command | What it does | When to run it |
 |---|---|---|
-| `npm install` | It installs jsdom. The detector tests use jsdom to simulate a web page. | Once, before the first test run. |
+| `npm install` | It installs jsdom and Puppeteer. The detector tests use jsdom to simulate a web page. Puppeteer downloads Chrome for Testing, about 150 MB. | Once, before the first test run. |
 | `npm test` | It runs the automated tests. They check which extensions go off, how stored settings are migrated, and whether the detector finds sensitive fields. | After every code change. |
+| `npm run test:chrome` | It starts Chrome for Testing with Exterminator and a dummy extension. It checks that a protected site and a detected password field turn the dummy off, and that it comes back after you leave or log in. Puppeteer installs Chrome for Testing during `npm install`. | Before a release, and after changes to `background.js` or `lib/tabs.js`. |
 | `npm run icons` | It regenerates the icons in `icons/` with Python 3. | When you change the icon design in `tools/make-icons.py`. |
 | `npm run preview` | It serves the project on http://127.0.0.1:8766. Open `tools/preview/popup.html?s=detected` (or `s=strict`, `s=idle`) or `tools/preview/options.html?s=strict` to see the popup or the settings page with fake data. | When you change the popup or the settings page. |
 | `npm run package` | It builds `dist/exterminator-<version>.zip`. The zip holds only the files the extension needs. Tests and tools are left out. | When you share the extension or upload it to the Chrome Web Store. |
