@@ -76,9 +76,11 @@ Turning an extension off does not remove the scripts it already injected into a 
 
 ## Development
 
-```sh
-npm install     # installs jsdom for the detector tests
-npm test        # runs 75 tests for the planner, storage, domains, risk labels, i18n, UI helpers and detector
-npm run icons   # regenerates icons/ with Python 3
-npm run package # builds dist/exterminator-<version>.zip without development files
-```
+This section is for people who change the code. Using the extension requires only the steps under "Install". Run the commands below in a terminal, inside the project folder. They need Node.js 22 or newer.
+
+| Command | What it does | When to run it |
+|---|---|---|
+| `npm install` | It installs jsdom. The detector tests use jsdom to simulate a web page. | Once, before the first test run. |
+| `npm test` | It runs the 75 automated tests. They check which extensions go off, how stored settings are migrated, and whether the detector finds sensitive fields. | After every code change. |
+| `npm run icons` | It regenerates the icons in `icons/` with Python 3. | When you change the icon design in `tools/make-icons.py`. |
+| `npm run package` | It builds `dist/exterminator-<version>.zip`. The zip holds only the files the extension needs. Tests and tools are left out. | When you share the extension or upload it to the Chrome Web Store. |
