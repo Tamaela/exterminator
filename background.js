@@ -1,5 +1,5 @@
 import { t } from './lib/i18n.js';
-import { hostOf, matchSite } from './lib/domains.js';
+import { hostOf, matchSite, suggestDomain } from './lib/domains.js';
 import { plan, siteForTab, describeTab, allowlistedIds } from './lib/planner.js';
 import { describePermission, permissionSnapshot } from './lib/risk.js';
 import {
@@ -7,7 +7,7 @@ import {
   getAlerts, setAlerts, getApprovals, setApprovals, addLog, actions,
   getFlaggedTabs, setFlaggedTabs, getFramedTabs, setFramedTabs, getPrerenderTabs, setPrerenderTabs,
   getLoadTimes, setLoadTimes, isBooted, markBooted, getInheritedTabs, setInheritedTabs,
-  getLoadHistory, setLoadHistory, isUpdatePending, markUpdatePending,
+  getLoadHistory, setLoadHistory, isUpdatePending, markUpdatePending, getAsks, setAsks, openAsks,
 } from './lib/storage.js';
 
 // Grace period before extensions come back or a site is cleaned up, so that
@@ -21,7 +21,7 @@ const AUDIT_MINUTES = 30;
 const FAST_AUDIT_ALARM = 'exterminator-audit-active';
 const DETECTOR_ID = 'field-detector';
 const DETECTOR_ORIGINS = ['http://*/*', 'https://*/*'];
-const NOTIFY = { intrusion: 'intrusion', frame: 'frame-', stale: 'stale-', disableFailed: 'disable-failed', clipboard: 'clipboard-failed' };
+const NOTIFY = { intrusion: 'intrusion', frame: 'frame-', stale: 'stale-', disableFailed: 'disable-failed', clipboard: 'clipboard-failed', ask: 'ask-' };
 const HISTORY_MAX = 20;
 
 // --- Task queue ---------------------------------------------------------------------------
@@ -187,7 +187,19 @@ async function flagTab(tab, reused) {
   const again = recheckedTabs.get(tab.id) === host;
   recheckedTabs.delete(tab.id);
   if (!site && !again) await addLog({ type: 'detected', site: host });
+  if (!site) await askLevel(suggestDomain(host), settings);
   return true;
+}
+
+// The first detection on a site you haven't classified: ask once how to protect it.
+// The question itself is shown only in Exterminator's own popup and settings page, never in
+// the web page, so the page can't fake it or trick you into lowering protection.
+async function askLevel(domain, settings) {
+  const asks = await getAsks();
+  if (domain in asks || !openAsks({ [domain]: 0 }, settings).length) return;
+  asks[domain] = Date.now();
+  await setAsks(asks);
+  await notify(`${NOTIFY.ask}${domain}`, { title: t('askNotifyTitle', { domain }), message: t('askNotifyMessage') });
 }
 
 // The tab shows another page: drop its flag. The detector of the new page flags it again if
@@ -478,13 +490,15 @@ function cancelCheck() {
 }
 
 let lastBadge = null;
-async function setBadge({ mode, count }) {
+async function setBadge({ mode, count, ask }) {
+  if (ask && mode !== 'pause') mode = 'ask';
   const key = `${mode}:${count}`;
   if (key === lastBadge) return;
   lastBadge = key;
   const cfg = {
     on: { text: 'ON', color: '#1a7f37', title: t('badgeOnTitle', { count }) },
     pause: { text: 'II', color: '#9a6700', title: t('badgePausedTitle') },
+    ask: { text: '?', color: '#bc4c00', title: t('badgeAskTitle') },
     off: { text: '', color: '#1a7f37', title: t('extName') },
   }[mode];
   await chrome.action.setBadgeText({ text: cfg.text });
@@ -577,7 +591,12 @@ async function evaluate(opts = {}) {
     await notify(`${NOTIFY.stale}${tabId}`, { title: t('staleTabTitle'), message: t('staleTabMessage', { site: domain }) });
   }
 
-  await setBadge(p.badge);
+  // Questions answered elsewhere (a site added, excluded or marked "login only") are dropped,
+  // so a site you later remove is asked about again on its next detection.
+  const asks = await getAsks();
+  const open = openAsks(asks, settings);
+  if (open.length !== Object.keys(asks).length) await setAsks(Object.fromEntries(open.map((d) => [d, asks[d]])));
+  await setBadge({ ...p.badge, ask: open.length > 0 });
   p.scheduleCheck ? scheduleCheck() : cancelCheck();
   const active = nextState.activeSites.length > 0;
   await syncFastAudit(active);
@@ -752,7 +771,7 @@ chrome.storage.onChanged.addListener((changes, area) => {
   if (changes[KEYS.settings]) {
     run(async () => syncDetector(await getSettings()));
   }
-  if (changes[KEYS.settings] || changes[KEYS.paused]) requestCheck();
+  if (changes[KEYS.settings] || changes[KEYS.paused] || changes[KEYS.asks]) requestCheck();
 });
 
 // Website access revoked in chrome://extensions: turn detection off.
@@ -770,6 +789,12 @@ chrome.alarms.onAlarm.addListener((alarm) => {
 
 chrome.notifications.onClicked.addListener((id) => {
   if (id.startsWith('alert-')) chrome.runtime.openOptionsPage();
+  if (id.startsWith(NOTIFY.ask)) {
+    chrome.notifications.clear(id);
+    // The popup holds the question. Chrome may refuse to open it (no focused window, or an
+    // older Chrome): the settings page shows the same question.
+    Promise.resolve().then(() => chrome.action.openPopup()).catch(() => chrome.runtime.openOptionsPage());
+  }
 });
 chrome.notifications.onButtonClicked.addListener((id) => {
   if (id === NOTIFY.intrusion) run(reloadAllProtectedTabs);

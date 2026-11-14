@@ -227,9 +227,6 @@
   "protectedVia": {
     "message": "✓ Protected via {domain}"
   },
-  "logOutWhenLeaving": {
-    "message": "Log out when leaving (clear cookies and site data)"
-  },
   "removeProtection": {
     "message": "Remove protection"
   },
@@ -294,7 +291,7 @@
     "message": "Protected sites"
   },
   "sitesIntro": {
-    "message": "On these sites (and their subdomains) all extensions are turned off, except the allowed ones. Protected mode stays active as long as a tab of a protected site is open anywhere."
+    "message": "On these sites (and their subdomains) all extensions are turned off, except the allowed ones. Protected mode stays active as long as a tab of a protected site is open anywhere. New sites are Strict unless you choose Whole site."
   },
   "domainPlaceholder": {
     "message": "e.g. mybank.com"
@@ -318,7 +315,7 @@
     "message": "Protect every page with a password field"
   },
   "fieldDetectionHelpHtml": {
-    "message": "Extensions are also turned off on sites that aren't in your list (only \"Always on\" stays on). The tab stays protected until you leave that website. Chrome will ask for access to all websites for this; Exterminator only checks <em>whether</em> such a field exists and reads nothing else."
+    "message": "Extensions are also turned off on sites that aren't in your list (only \"Always on\" stays on). This lasts while the tab shows the page with the field. Chrome will ask for access to all websites for this; Exterminator only checks <em>whether</em> such a field exists and reads nothing else."
   },
   "detectionDenied": {
     "message": "Without access to websites, Exterminator cannot detect sensitive fields."
@@ -351,7 +348,7 @@
     "message": "The clipboard is emptied before extensions come back, so a copied password or account number can't be read. Note: this also happens if you meant to paste something on another site."
   },
   "cleanupHelpHtml": {
-    "message": "For each site above you can also turn on <strong>Log out when leaving</strong>: the site's cookies and site data are then cleared, so extensions can't take over your session."
+    "message": "Sites with the level <strong>Strict</strong> are also logged out when you leave: their cookies and site data are cleared, so extensions can't take over your session. The clipboard is cleared as well."
   },
   "alwaysOnHeading": {
     "message": "Always on"
@@ -484,5 +481,68 @@
   },
   "goToSite": {
     "message": "Go to this tab"
+  },
+  "level_login": {
+    "message": "Login pages only"
+  },
+  "level_login_help": {
+    "message": "Extensions are off only on pages with a password, code or payment field. For forums, social media and shops."
+  },
+  "level_site": {
+    "message": "Whole site"
+  },
+  "level_site_help": {
+    "message": "Extensions are off while the site is open. You stay logged in. For webmail and social media with private messages."
+  },
+  "level_strict": {
+    "message": "Strict"
+  },
+  "level_strict_help": {
+    "message": "Extensions are off while the site is open. When you leave, you are logged out and the clipboard is cleared. For your bank, tax office and health insurer."
+  },
+  "level_never": {
+    "message": "Never protect this site"
+  },
+  "levelNeverConfirm": {
+    "message": "Sure? Extensions stay on here"
+  },
+  "levelLoginWarning": {
+    "message": "After you leave the page with the field, extensions can read the rest of this site and act in your login session."
+  },
+  "levelSiteWarning": {
+    "message": "After you leave this site, extensions can use your login session."
+  },
+  "askHeading": {
+    "message": "Exterminator found a password or code field on {domain}."
+  },
+  "askQuestion": {
+    "message": "How should Exterminator protect this site? You can change this later."
+  },
+  "asksHeading": {
+    "message": "Choose a protection level"
+  },
+  "askNotifyTitle": {
+    "message": "Extensions are off on {domain}"
+  },
+  "askNotifyMessage": {
+    "message": "Click to choose how Exterminator protects this site."
+  },
+  "badgeAskTitle": {
+    "message": "Exterminator: choose how to protect a site"
+  },
+  "loginOnlyLabel": {
+    "message": "Login pages only"
+  },
+  "loginOnlyHelp": {
+    "message": "You chose Login pages only for these sites. Exterminator does not ask about them again."
+  },
+  "loginOnlyStatus": {
+    "message": "Level for {domain}: Login pages only"
+  },
+  "noLoginOnly": {
+    "message": "No sites."
+  },
+  "askAgain": {
+    "message": "Ask again"
   }
 }

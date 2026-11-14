@@ -233,6 +233,8 @@ test('"log out when leaving" cleans every visited subdomain, after the grace per
   const later = plan(input({ now: NOW + GRACE, settings, state: left.nextState, tabs: [{ id: 2, url: 'https://tax.gov/' }] }));
   assert.deepEqual(later.cleanup, [{ domain: 'bank.com', hosts: ['bank.com', 'online.bank.com', 'www.bank.com'] }]);
   assert.deepEqual(later.nextState.siteHosts, {});
+  assert.equal(later.clearClipboard, true, 'leaving a strict site clears the clipboard');
+  assert.equal(left.clearClipboard, false);
   const back = plan(input({ now: NOW + 1, settings, state: left.nextState, tabs: [{ id: 2, url: 'https://tax.gov/' }, { id: 3, url: 'https://bank.com/' }] }));
   assert.deepEqual(back.cleanup, [], 'returning within the grace period cancels the cleanup');
 });

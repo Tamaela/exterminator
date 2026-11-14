@@ -171,3 +171,21 @@ button.site-link {
   text-decoration: underline; text-underline-offset: 2px; cursor: pointer;
 }
 button.site-link:hover { filter: none; text-decoration-thickness: 2px; }
+
+/* Protection levels */
+#add-site select { font: inherit; padding: 5px 6px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); color: var(--fg); }
+.level-picker { margin: 8px 0; }
+.level-option { display: flex; gap: 8px; align-items: flex-start; padding: 3px 0; font-size: 13px; cursor: pointer; }
+.level-option input { margin-top: 3px; }
+.level-warning { color: var(--warn); font-size: 12px; margin: 4px 0 0; }
+.ask-card {
+  border: 1px solid color-mix(in srgb, #bc4c00 50%, var(--border));
+  border-radius: 8px;
+  padding: 10px;
+  margin: 0 0 10px;
+  background: var(--bg);
+}
+.ask-card button.level-choice { display: block; width: 100%; text-align: left; margin: 6px 0; }
+.ask-card button.level-choice span { display: block; font-size: 12px; opacity: 0.85; }
+.ask-card button.danger { margin-top: 4px; }
+.popup #asks:not([hidden]) { padding-bottom: 0; }

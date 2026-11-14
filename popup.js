@@ -1,13 +1,18 @@
 import { t, localizePage } from './lib/i18n.js';
-import { suggestDomain, matchSite } from './lib/domains.js';
+import { suggestDomain, matchSite, findDomain } from './lib/domains.js';
 import { describeTab, siteForTab } from './lib/planner.js';
 import { riskOf, permissionSnapshot } from './lib/risk.js';
-import { KEYS, getSettings, getState, isPaused, setPaused, pauseFor, getAlerts, getFlaggedTabs, getFramedTabs, actions } from './lib/storage.js';
+import {
+  KEYS, getSettings, getState, isPaused, setPaused, pauseFor, getAlerts, getFlaggedTabs, getFramedTabs, actions,
+  getAsks, openAsks, levelOf,
+} from './lib/storage.js';
 import { el, readDomain, onStorageChange } from './lib/ui.js';
+import { levelPicker, askCard } from './lib/levels.js';
 
 localizePage();
 
 const warnEl = document.getElementById('warnings');
+const askEl = document.getElementById('asks');
 const siteEl = document.getElementById('site');
 const statusEl = document.getElementById('status');
 const pauseBtn = document.getElementById('pause');
@@ -23,6 +28,14 @@ function renderWarnings(alerts) {
   warnEl.hidden = !warnEl.childElementCount;
 }
 
+// Questions about detected sites; the one for the current tab comes first.
+function renderAsks(asks, settings) {
+  const current = suggestDomain(describeTab(tab?.url, tab?.id, settings, {}).host || '');
+  const open = openAsks(asks, settings).sort((a, b) => (b === current) - (a === current));
+  askEl.replaceChildren(...open.map(askCard));
+  askEl.hidden = !open.length;
+}
+
 function renderSite(settings, flaggedTabs) {
   const { host, site, exclusion, detected } = describeTab(tab?.url, tab?.id, settings, flaggedTabs);
   siteEl.replaceChildren();
@@ -35,9 +48,7 @@ function renderSite(settings, flaggedTabs) {
   if (site) {
     siteEl.append(
       el('p', { className: 'ok', textContent: site.domain === host ? t('protectedSite') : t('protectedVia', { domain: site.domain }) }),
-      el('label', { className: 'toggle small-text' },
-        el('input', { type: 'checkbox', checked: site.cleanup, onchange: (e) => actions.setSiteCleanup(site.domain, e.target.checked) }),
-        el('span', { textContent: t('logOutWhenLeaving') })),
+      levelPicker('level', levelOf(site), ['site', 'strict'], (level) => actions.setSiteLevel(site.domain, level)),
       el('button', { className: 'danger', textContent: t('removeProtection'), onclick: () => actions.removeSite(site.domain) }),
     );
     return;
@@ -54,17 +65,23 @@ function renderSite(settings, flaggedTabs) {
       el('button', { className: 'secondary small', textContent: t('neverAutoProtect'), onclick: () => actions.addExclusion(suggestDomain(host)) }),
     );
   }
+  const loginOnly = settings.fieldDetection && findDomain(host, settings.loginOnly);
+  if (loginOnly) siteEl.append(el('p', { className: 'muted', textContent: t('loginOnlyStatus', { domain: loginOnly }) }));
 
   const input = el('input', { type: 'text', value: suggestDomain(host), spellcheck: false });
   const error = el('p', { className: 'error', hidden: true });
+  // "Login pages only" depends on automatic protection, so it is offered only when that is on.
+  const levels = settings.fieldDetection && !loginOnly ? ['login', 'site', 'strict'] : ['site', 'strict'];
+  let level = 'strict';
   const add = () => {
     const domain = readDomain(input, error);
-    if (domain) actions.addSite(domain);
+    if (domain) actions.chooseLevel(domain, level);
   };
   input.addEventListener('keydown', (e) => e.key === 'Enter' && add());
   siteEl.append(
     el('label', { className: 'field' }, el('span', { textContent: t('domainLabel') }), input),
     error,
+    levelPicker('new-level', level, levels, (chosen) => { level = chosen; }),
     el('button', { textContent: t('protectThisSite'), onclick: add }),
   );
 }
@@ -140,10 +157,11 @@ function renderStatus(paused, state, byId) {
 }
 
 async function render() {
-  const [settings, state, paused, exts, flaggedTabs, alerts] = await Promise.all([
-    getSettings(), getState(), isPaused(), chrome.management.getAll(), getFlaggedTabs(), getAlerts(),
+  const [settings, state, paused, exts, flaggedTabs, alerts, asks] = await Promise.all([
+    getSettings(), getState(), isPaused(), chrome.management.getAll(), getFlaggedTabs(), getAlerts(), getAsks(),
   ]);
   renderWarnings(alerts);
+  renderAsks(asks, settings);
   renderSite(settings, flaggedTabs);
   renderStatus(paused, state, new Map(exts.map((e) => [e.id, e])));
 }
@@ -156,6 +174,6 @@ document.getElementById('open-options').addEventListener('click', (e) => {
   e.preventDefault();
   chrome.runtime.openOptionsPage();
 });
-onStorageChange([KEYS.settings, KEYS.state, KEYS.paused, KEYS.flaggedTabs, KEYS.alerts], render);
+onStorageChange([KEYS.settings, KEYS.state, KEYS.paused, KEYS.flaggedTabs, KEYS.alerts, KEYS.asks], render);
 
 render();

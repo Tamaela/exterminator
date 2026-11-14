@@ -1,7 +1,7 @@
 import './chrome-stub.js';
 import { test, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { migrate, getSettings, isPaused, pauseFor, getState, actions, addLog, getLog, logText, normalizeSettings, LOG_MAX, SCHEMA_VERSION } from '../lib/storage.js';
+import { migrate, getSettings, isPaused, pauseFor, getState, actions, addLog, getLog, logText, normalizeSettings, LOG_MAX, SCHEMA_VERSION, getAsks, setAsks, openAsks } from '../lib/storage.js';
 import { PAUSE_MAX_MS } from '../lib/planner.js';
 
 beforeEach(() => {
@@ -37,7 +37,8 @@ test('actions update settings without duplicates', async () => {
   await actions.addSite('bank.com');
   await actions.addSite('bank.com');
   await actions.setSiteExtra('bank.com', 'grammar', true);
-  await actions.setSiteCleanup('bank.com', true);
+  await actions.setSiteLevel('bank.com', 'site');
+  await actions.setSiteLevel('bank.com', 'strict');
   await actions.setAlwaysOn('pw', true);
   await actions.addExclusion('shop.com');
   const s = await getSettings();
@@ -47,6 +48,26 @@ test('actions update settings without duplicates', async () => {
 
   const where = await actions.removeFromAllowlists(['grammar', 'pw']);
   assert.deepEqual(where.grammar, { global: false, sites: ['bank.com'] });
+});
+
+test('new sites are strict unless another level is chosen', async () => {
+  await actions.addSite('bank.com');
+  await actions.addSite('forum.com', 'site');
+  assert.deepEqual((await getSettings()).sites.map((x) => [x.domain, x.cleanup]), [['bank.com', true], ['forum.com', false]]);
+});
+
+test('answering the question stores the level and closes the question', async () => {
+  await setAsks({ 'forum.com': 1, 'bank.com': 2, 'shop.com': 3, 'social.com': 4, 'news.com': 5 });
+  await actions.chooseLevel('forum.com', 'login');
+  await actions.chooseLevel('bank.com', 'strict');
+  await actions.chooseLevel('social.com', 'site');
+  await actions.chooseLevel('shop.com', 'never');
+  const s = await getSettings();
+  assert.deepEqual(s.loginOnly, ['forum.com']);
+  assert.deepEqual(s.sites.map((x) => [x.domain, x.cleanup]), [['bank.com', true], ['social.com', false]]);
+  assert.deepEqual(s.detectionExclusions, ['shop.com']);
+  assert.deepEqual(Object.keys(await getAsks()), ['news.com']);
+  assert.deepEqual(openAsks({ 'news.com': 1, 'login.social.com': 2 }, s), ['news.com'], 'a site that is already covered is not asked about');
 });
 
 test('"Allow again" approves the permissions shown in the alert, in one write', async () => {

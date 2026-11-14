@@ -21,11 +21,20 @@
       <ul id="alerts" class="alert-list"></ul>
     </section>
 
+    <section class="card" id="asks-card" hidden>
+      <h2 data-i18n="asksHeading"></h2>
+      <div id="asks"></div>
+    </section>
+
     <section class="card">
       <h2 data-i18n="sitesHeading"></h2>
       <p class="muted" data-i18n="sitesIntro"></p>
       <form id="add-site" class="row">
         <input type="text" id="new-domain" data-i18n-placeholder="domainPlaceholder" spellcheck="false">
+        <select id="new-level">
+          <option value="strict" data-i18n="level_strict" selected></option>
+          <option value="site" data-i18n="level_site"></option>
+        </select>
         <button type="submit" data-i18n="add"></button>
       </form>
       <p id="add-error" class="error" hidden></p>
@@ -54,6 +63,11 @@
         </form>
         <p id="exclusion-error" class="error" hidden></p>
         <ul id="exclusions" class="plain-list"></ul>
+      </div>
+      <div class="sub-block">
+        <strong data-i18n="loginOnlyLabel"></strong><br>
+        <span class="muted" data-i18n="loginOnlyHelp"></span>
+        <ul id="login-only" class="plain-list"></ul>
       </div>
     </section>
 

@@ -1,9 +1,10 @@
 import { t, localizePage } from './lib/i18n.js';
 import { riskOf, describePermission, canManageExtensions, sortByRisk, permissionSnapshot } from './lib/risk.js';
 import {
-  KEYS, getSettings, getAlerts, getLog, clearLog, logText, actions,
+  KEYS, getSettings, getAlerts, getLog, clearLog, logText, actions, getAsks, openAsks, levelOf,
 } from './lib/storage.js';
 import { el, readDomain, onStorageChange } from './lib/ui.js';
+import { levelPicker, askCard } from './lib/levels.js';
 
 localizePage();
 
@@ -110,6 +111,21 @@ function renderExclusions(settings) {
     : [el('li', { className: 'muted', textContent: t('noExceptions') })]));
 }
 
+function renderLoginOnly(settings) {
+  const list = [...settings.loginOnly].sort();
+  $('login-only').replaceChildren(...(list.length
+    ? list.map((domain) => el('li', {},
+      el('span', { className: 'domain', textContent: domain }),
+      el('button', { className: 'secondary small', textContent: t('askAgain'), onclick: () => actions.removeLoginOnly(domain) })))
+    : [el('li', { className: 'muted', textContent: t('noLoginOnly') })]));
+}
+
+function renderAsks(asks, settings) {
+  const open = openAsks(asks, settings);
+  $('asks-card').hidden = !open.length;
+  $('asks').replaceChildren(...open.map(askCard));
+}
+
 function renderLog(log) {
   $('log').replaceChildren(...(log.length
     ? log.slice(0, 100).map((entry) => el('li', { className: entry.type === 'error' ? 'error' : '' },
@@ -136,16 +152,14 @@ function renderSites(settings, exts) {
       el('div', { className: 'site-head' },
         el('span', { className: 'domain', textContent: site.domain }),
         el('button', { className: 'danger', textContent: t('remove'), onclick: () => actions.removeSite(site.domain) })),
-      el('label', { className: 'toggle small-text' },
-        el('input', { type: 'checkbox', checked: site.cleanup, onchange: (e) => actions.setSiteCleanup(site.domain, e.target.checked) }),
-        el('span', { textContent: t('logOutWhenLeaving') })),
+      levelPicker(`level-${site.domain}`, levelOf(site), ['site', 'strict'], (level) => actions.setSiteLevel(site.domain, level)),
       details);
   }) : [el('p', { className: 'muted', textContent: t('noSites') })]));
 }
 
 async function render() {
-  const [settings, all, alerts, log, incognitoAllowed] = await Promise.all([
-    getSettings(), chrome.management.getAll(), getAlerts(), getLog(), chrome.extension.isAllowedIncognitoAccess(),
+  const [settings, all, alerts, log, incognitoAllowed, asks] = await Promise.all([
+    getSettings(), chrome.management.getAll(), getAlerts(), getLog(), chrome.extension.isAllowedIncognitoAccess(), getAsks(),
   ]);
   const exts = sortExtensions(all.filter((e) => e.id !== chrome.runtime.id && e.type !== 'theme'));
 
@@ -153,6 +167,8 @@ async function render() {
   renderAlerts(alerts);
   renderLog(log);
   renderExclusions(settings);
+  renderLoginOnly(settings);
+  renderAsks(asks, settings);
   renderSites(settings, exts);
 
   $('field-detection').checked = settings.fieldDetection;
@@ -173,7 +189,7 @@ $('add-site').addEventListener('submit', (e) => {
   const domain = readDomain($('new-domain'), $('add-error'));
   if (!domain) return;
   $('new-domain').value = '';
-  actions.addSite(domain);
+  actions.addSite(domain, $('new-level').value);
 });
 
 $('add-exclusion').addEventListener('submit', (e) => {
@@ -211,7 +227,7 @@ $('sort').addEventListener('change', (e) => {
   render();
 });
 
-onStorageChange([KEYS.settings, KEYS.alerts, KEYS.log], render);
+onStorageChange([KEYS.settings, KEYS.alerts, KEYS.log, KEYS.asks], render);
 for (const event of ['onInstalled', 'onUninstalled', 'onEnabled', 'onDisabled']) chrome.management[event].addListener(render);
 
 render();
