@@ -486,19 +486,19 @@
     "message": "Login pages only"
   },
   "level_login_help": {
-    "message": "Extensions are off only on pages with a password, code or payment field. For forums, social media and shops."
+    "message": "Extensions are off only on pages with a password, code or payment field. For example forums, social media and shops."
   },
   "level_site": {
     "message": "Whole site"
   },
   "level_site_help": {
-    "message": "Extensions are off while the site is open. You stay logged in. For webmail and social media with private messages."
+    "message": "Extensions are off while the site is open. You stay logged in. For example webmail and social media with private messages."
   },
   "level_strict": {
     "message": "Strict"
   },
   "level_strict_help": {
-    "message": "Extensions are off while the site is open. When you leave, you are logged out and the clipboard is cleared. For your bank, tax office and health insurer."
+    "message": "Extensions are off while the site is open. When you leave, you are logged out and the clipboard is cleared. For example your bank, tax office or health insurer."
   },
   "level_never": {
     "message": "Never protect this site"

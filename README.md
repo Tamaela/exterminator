@@ -8,7 +8,7 @@ An extension can read everything on the pages it runs on. That includes password
 
 - You add a protected site from the toolbar icon or the settings page. Subdomains are protected too. Each site has a protection level:
 
-  | Level | Extensions off | When you leave | Suited for |
+  | Level | Extensions off | When you leave | Examples |
   |---|---|---|---|
   | Login pages only | On pages with a password, code or payment field | Nothing happens. | Forums, social media, shops |
   | Whole site | While any tab of the site is open | You stay logged in. | Webmail, social media with private messages |
