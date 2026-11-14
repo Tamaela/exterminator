@@ -14,7 +14,7 @@ This file holds the texts for the Chrome Web Store developer dashboard. Copy eac
 
 **Description:**
 
-> Every extension can read the pages it runs on. That includes passwords, account numbers and the forms you fill in. Tab Chaperone turns off your other extensions while a sensitive website is open, such as your bank or your tax office. It turns them back on when you leave.
+> Many extensions can read the pages they run on. That includes passwords, account numbers and the forms you fill in. Tab Chaperone turns off your other extensions while a sensitive website is open, such as your bank or your tax office. It turns them back on when you leave.
 >
 > What Tab Chaperone does:
 > - You choose the sites to protect. Each site gets a level. "Login pages only" protects pages with a password, code or payment field. "Whole site" protects the site while a tab of it is open. "Strict" also logs you out when you leave, by clearing the site's cookies and site data and the clipboard.
