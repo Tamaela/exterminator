@@ -84,3 +84,7 @@ This section is for people who change the code. Using the extension requires onl
 | `npm test` | It runs the 75 automated tests. They check which extensions go off, how stored settings are migrated, and whether the detector finds sensitive fields. | After every code change. |
 | `npm run icons` | It regenerates the icons in `icons/` with Python 3. | When you change the icon design in `tools/make-icons.py`. |
 | `npm run package` | It builds `dist/exterminator-<version>.zip`. The zip holds only the files the extension needs. Tests and tools are left out. | When you share the extension or upload it to the Chrome Web Store. |
+
+## License
+
+Exterminator is released under the MIT License. The full text is in `LICENSE`.
