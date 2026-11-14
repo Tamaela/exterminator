@@ -749,7 +749,7 @@ async function restrictStorage() {
 // --- Boot ----------------------------------------------------------------------------------------
 
 // Runs once per browser session and after the extension is installed, updated or
-// re-enabled (storage.session is cleared in all those cases) — unlike onStartup.
+// re-enabled, because storage.session is cleared in all those cases. onStartup covers only the first case.
 async function boot() {
   await restrictStorage();
   if (await isBooted()) return;

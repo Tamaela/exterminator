@@ -411,7 +411,7 @@
     "message": "Good to know"
   },
   "tipDetection": {
-    "message": "Password fields are detected even when hidden or inside (open) Shadow DOM — you never need to click them."
+    "message": "Password fields are detected when they are hidden or inside Shadow DOM. Detection works without clicking the field."
   },
   "tipReload": {
     "message": "A protected tab is reloaded when it was loaded while an extension that this site doesn't allow was still on, so scripts that extension had injected are gone."
