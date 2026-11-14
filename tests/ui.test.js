@@ -20,7 +20,7 @@ test('el() refuses markup properties', () => {
   assert.throws(() => el('iframe', { srcdoc: 'x' }), /not allowed/);
 });
 
-test('audit fix: el() refuses string event handlers and javascript: URLs', () => {
+test('el() refuses string event handlers and javascript: URLs', () => {
   assert.throws(() => el('button', { onclick: 'alert(1)' }), /not allowed/);
   assert.throws(() => el('a', { href: ' JavaScript:alert(1)' }), /not allowed/);
   assert.equal(el('a', { href: 'https://example.com/' }).href, 'https://example.com/');

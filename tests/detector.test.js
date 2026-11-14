@@ -84,7 +84,7 @@ test('reports only once per showing', async () => {
   assert.equal(await count('<input type="password">', { act }), 1);
 });
 
-test('audit fix: a page restored from the back/forward cache reports again, marked as reused', async () => {
+test('a page restored from the back/forward cache reports again, marked as reused', async () => {
   const act = (w) => {
     const event = new w.Event('pageshow');
     event.persisted = true;
@@ -94,7 +94,7 @@ test('audit fix: a page restored from the back/forward cache reports again, mark
   assert.deepEqual(messages, [{ type: 'sensitive-field', reused: false }, { type: 'sensitive-field', reused: true }]);
 });
 
-test('audit fix: a prerendered page waits until it is shown, then reports as reused', async () => {
+test('a prerendered page waits until it is shown, then reports as reused', async () => {
   let w;
   const before = (win) => { w = win; Object.defineProperty(win.document, 'prerendering', { configurable: true, value: true }); };
   const act = () => {
@@ -121,7 +121,7 @@ const withClosedRoots = (w) => {
   w.chrome.dom = { openOrClosedShadowRoot: (el) => roots.get(el) };
 };
 
-test('audit fix: password inside a closed shadow root is detected', async () => {
+test('password inside a closed shadow root is detected', async () => {
   const before = (w) => {
     withClosedRoots(w);
     addPassword(w.document.getElementById('h').attachShadow({ mode: 'closed' }), w.document);
@@ -129,7 +129,7 @@ test('audit fix: password inside a closed shadow root is detected', async () => 
   assert.equal(await count('<div id="h"></div>', { before }), 1);
 });
 
-test('audit fix: password added later inside a closed shadow root is detected', async () => {
+test('password added later inside a closed shadow root is detected', async () => {
   let root;
   const before = (w) => {
     withClosedRoots(w);
@@ -138,7 +138,7 @@ test('audit fix: password added later inside a closed shadow root is detected', 
   assert.equal(await count('<div id="h"></div>', { before, act: (w) => addPassword(root, w.document) }), 1);
 });
 
-test('audit fix: a text field masked with -webkit-text-security counts as a password field', async () => {
+test('a text field masked with -webkit-text-security counts as a password field', async () => {
   const before = (w) => {
     const real = w.getComputedStyle.bind(w);
     w.getComputedStyle = (el) => (el.id === 'pin' ? { webkitTextSecurity: 'disc', getPropertyValue: () => 'disc' } : real(el));
@@ -147,14 +147,14 @@ test('audit fix: a text field masked with -webkit-text-security counts as a pass
   assert.equal(await count('<input id="name">'), 0);
 });
 
-test('run-3 fix: injecting the detector again makes a live detector scan and report anew', async () => {
+test('injecting the detector again makes a live detector scan and report anew', async () => {
   const before = (w) => { w.chrome.runtime.id = 'self'; };
   const act = (w) => w.eval(code); // e.g. field detection turned back on
   const messages = await detect('<input type="password">', { before, act });
   assert.equal(messages.length, 2, 'reported again, so the background can flag the tab again');
 });
 
-test('run-3 fix: an orphaned detector does not block a new one', async () => {
+test('an orphaned detector does not block a new one', async () => {
   const before = (w) => {
     w.eval(code); // detector of an Exterminator instance that is gone (no runtime.id)
     w.chrome.runtime.id = 'self';
