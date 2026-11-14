@@ -1,12 +1,12 @@
 import { t } from './lib/i18n.js';
 import { hostOf, matchSite } from './lib/domains.js';
 import { plan, siteForTab, describeTab, allowlistedIds } from './lib/planner.js';
-import { describePermission } from './lib/risk.js';
+import { describePermission, permissionSnapshot } from './lib/risk.js';
 import {
   KEYS, migrate, getSettings, isPaused, setPaused, getState, setState,
   getAlerts, setAlerts, getApprovals, setApprovals, addLog, actions,
-  getFlaggedTabs, setFlaggedTabs, getFramedTabs, setFramedTabs, getLoadTimes, setLoadTimes,
-  isBooted, markBooted,
+  getFlaggedTabs, setFlaggedTabs, getFramedTabs, setFramedTabs, getPrerenderTabs, setPrerenderTabs,
+  getLoadTimes, setLoadTimes, isBooted, markBooted,
 } from './lib/storage.js';
 
 // Grace period before extensions come back or a site is cleaned up, so that
@@ -15,6 +15,9 @@ const GRACE_MS = 3000;
 const CHECK_ALARM = 'exterminator-check';
 const AUDIT_ALARM = 'exterminator-audit';
 const AUDIT_MINUTES = 30;
+// While protected mode is active, permissions of allowed extensions are re-checked every minute
+// (permissions granted at runtime fire no event).
+const FAST_AUDIT_ALARM = 'exterminator-audit-active';
 const DETECTOR_ID = 'field-detector';
 const DETECTOR_ORIGINS = ['http://*/*', 'https://*/*'];
 const NOTIFY = { intrusion: 'intrusion', frame: 'frame-', disableFailed: 'disable-failed' };
@@ -81,9 +84,23 @@ async function setEnabled(id, enabled, name) {
 
 // --- Field detection (optional) ------------------------------------------------------------
 
+// Set by restrictStorage(): content scripts may only be injected when they cannot reach
+// the settings in storage.local.
+let storageRestricted = false;
+
+async function warnStorageUnrestricted() {
+  const { [KEYS.storageWarned]: warned } = await chrome.storage.session.get(KEYS.storageWarned);
+  if (warned) return;
+  await chrome.storage.session.set({ [KEYS.storageWarned]: true });
+  await addLog({ type: 'storageUnrestricted' });
+  await notify('storage-unrestricted', { title: t('storageUnrestrictedTitle'), message: t('storageUnrestrictedMessage') });
+}
+
+// Returns the detector files when the detector is (now) registered, otherwise null.
 async function syncDetector(settings) {
   const hasPermission = await chrome.permissions.contains({ origins: DETECTOR_ORIGINS });
-  const want = settings.fieldDetection && hasPermission;
+  if (settings.fieldDetection && hasPermission && !storageRestricted) await warnStorageUnrestricted();
+  const want = settings.fieldDetection && hasPermission && storageRestricted;
   // The extended mode is passed as a separate file instead of via chrome.storage, so the
   // content script never needs storage access (see detector-extended.js).
   const js = settings.sensitiveFields ? ['detector-extended.js', 'detector.js'] : ['detector.js'];
@@ -99,14 +116,26 @@ async function syncDetector(settings) {
       js,
       runAt: 'document_start',
       allFrames: true,
+      // Also about:blank, srcdoc, blob: and data: frames created by a web page.
+      matchOriginAsFallback: true,
       persistAcrossSessions: true,
     }]);
-  } else if (want && current.js.join() !== js.join()) {
-    await chrome.scripting.updateContentScripts([{ id: DETECTOR_ID, js }]);
+    await injectDetector(js); // pages that were already open
+  } else if (want && (current.js.join() !== js.join() || current.matchOriginAsFallback !== true)) {
+    await chrome.scripting.updateContentScripts([{ id: DETECTOR_ID, js, matchOriginAsFallback: true }]);
   } else if (!want && current) {
     await chrome.scripting.unregisterContentScripts({ ids: [DETECTOR_ID] });
   }
   if (!want) await setFlaggedTabs({});
+  return want ? js : null;
+}
+
+// Runs the detector in pages that are already open (it ignores a second injection).
+async function injectDetector(js) {
+  const tabs = await chrome.tabs.query({ url: DETECTOR_ORIGINS });
+  await Promise.all(tabs.map((tab) => chrome.scripting
+    .executeScript({ target: { tabId: tab.id, allFrames: true }, files: js })
+    .catch(() => {}))); // e.g. an error page or the Web Store
 }
 
 // A tab with a sensitive field stays protected for as long as it stays on that host.
@@ -137,10 +166,12 @@ async function forgetTab(tabId, newUrl) {
     delete flagged[tabId];
     await setFlaggedTabs(flagged);
   }
-  const framed = await getFramedTabs();
-  if (tabId in framed) {
-    delete framed[tabId]; // the frames belonged to the previous document
-    await setFramedTabs(framed);
+  for (const [get, set] of [[getFramedTabs, setFramedTabs], [getPrerenderTabs, setPrerenderTabs]]) {
+    const map = await get();
+    if (tabId in map) {
+      delete map[tabId]; // frames and prerenders belonged to the previous document
+      await set(map);
+    }
   }
   if (newUrl === undefined) {
     const times = await getLoadTimes();
@@ -149,30 +180,63 @@ async function forgetTab(tabId, newUrl) {
   }
 }
 
-async function recordLoad(tabId) {
+// The commit time Chrome reports, not the moment this queued task runs: an earlier queued
+// task may have turned extensions off in between, after the page already got their scripts.
+async function recordLoad(tabId, committedAt) {
   const times = await getLoadTimes();
-  times[tabId] = Date.now();
+  times[tabId] = Math.min(committedAt ?? Infinity, Date.now());
   await setLoadTimes(times);
 }
 
-async function recordFrame(tabId, host) {
-  const framed = await getFramedTabs();
-  const hosts = new Set(framed[tabId] || []);
+async function addHost(get, set, tabId, host) {
+  const map = await get();
+  const hosts = new Set(map[tabId] || []);
   if (hosts.has(host)) return;
-  framed[tabId] = [...hosts, host];
-  await setFramedTabs(framed);
+  map[tabId] = [...hosts, host];
+  await set(map);
+}
+const recordFrame = (tabId, host) => addHost(getFramedTabs, setFramedTabs, tabId, host);
+const recordPrerender = (tabId, host) => addHost(getPrerenderTabs, setPrerenderTabs, tabId, host);
+
+// Protected hosts in the sub-frames a tab has right now. Needed when frames exist without a
+// new commit: a page restored from the back/forward cache, or after Exterminator restarted.
+async function rescanFrames(tabId) {
+  let frames;
+  try {
+    frames = await chrome.webNavigation.getAllFrames({ tabId });
+  } catch {
+    return [];
+  }
+  const { sites } = await getSettings();
+  const found = new Set();
+  for (const frame of frames || []) {
+    if (frame.parentFrameId === -1) continue; // a main frame
+    const host = hostOf(frame.url);
+    if (host && matchSite(host, sites)) found.add(host);
+  }
+  for (const host of found) await recordFrame(tabId, host);
+  return [...found];
+}
+
+// A tab was swapped for another one (e.g. a discarded tab coming back): keep what we know.
+async function replaceTab(added, removed) {
+  for (const [get, set] of [[getFlaggedTabs, setFlaggedTabs], [getFramedTabs, setFramedTabs], [getPrerenderTabs, setPrerenderTabs]]) {
+    const map = await get();
+    if (!(removed in map)) continue;
+    map[added] = map[removed];
+    delete map[removed];
+    await set(map);
+  }
+  const times = await getLoadTimes();
+  if (removed in times) {
+    delete times[removed]; // the new tab's load time is unknown: that forces a reload when needed
+    await setLoadTimes(times);
+  }
 }
 
 // --- Monitoring "Always on" extensions --------------------------------------------------------
 
-function snapshot(ext) {
-  return {
-    version: ext.version,
-    permissions: [...(ext.permissions || [])].sort(),
-    hostPermissions: [...(ext.hostPermissions || [])].sort(),
-  };
-}
-
+const snapshot = permissionSnapshot;
 const sameJson = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 
 /**
@@ -220,12 +284,19 @@ async function reconcileApprovals(extensions) {
   if (!escalated.length) return;
 
   const where = await actions.removeFromAllowlists(escalated.map((x) => x.ext.id));
-  const kept = alerts.filter((a) => !where[a.id]);
+  const latest = await getAlerts(); // re-read: the options page may have changed them meanwhile
+  const kept = latest.filter((a) => !where[a.id]);
   for (const { ext, added } of escalated) {
-    const previous = alerts.find((a) => a.id === ext.id);
+    const previous = latest.find((a) => a.id === ext.id);
     const permissions = added.length ? added : previous?.added || [];
     const detail = t('alertDetail', { version: ext.version, permissions: permissions.map(describePermission).join('; ') });
-    kept.push({ id: ext.id, name: ext.name, version: ext.version, added: permissions, where: previous?.where || where[ext.id], t: Date.now() });
+    kept.push({
+      id: ext.id, name: ext.name, version: ext.version, added: permissions,
+      // "Allow again" approves exactly this; anything added after the alert raises a new one.
+      approved: snapshot(ext),
+      where: previous?.where || where[ext.id],
+      t: Date.now(),
+    });
     await addLog({ type: 'alert', name: ext.name, detail });
     await notify(`alert-${ext.id}`, { title: t('alertTitle', { name: ext.name }), message: t('alertMessage', { detail }) });
   }
@@ -236,7 +307,7 @@ async function reconcileApprovals(extensions) {
 
 // Clears every host of the site that was actually visited while protected, plus the
 // domain itself and its www host (cookies are cleared registrable-domain wide by Chrome).
-async function cleanupSite({ domain, hosts }) {
+async function cleanupSite({ domain, hosts, incognito }) {
   try {
     const origins = hosts.flatMap((host) => [`https://${host}`, `http://${host}`]);
     await chrome.browsingData.remove(
@@ -247,6 +318,8 @@ async function cleanupSite({ domain, hosts }) {
   } catch (err) {
     await logError('errCleanup', { site: domain }, err);
   }
+  // browsingData only reaches the normal profile; incognito data lives until its windows close.
+  if (incognito) await addLog({ type: 'cleanupIncognito', site: domain });
 }
 
 async function clearClipboard() {
@@ -302,15 +375,30 @@ async function setBadge({ mode, count }) {
   await chrome.action.setTitle({ title: cfg.title });
 }
 
+let fastAudit = null;
+async function syncFastAudit(active) {
+  if (fastAudit === active) return;
+  fastAudit = active;
+  await (active ? chrome.alarms.create(FAST_AUDIT_ALARM, { periodInMinutes: 1 }) : chrome.alarms.clear(FAST_AUDIT_ALARM));
+}
+
+// Set when Chrome has an update for Exterminator: applied once protection is off, because
+// restarting clears what we know about open tabs (detected fields, frames).
+let updatePending = false;
+
 async function evaluate(opts = {}) {
-  await reconcileApprovals(await chrome.management.getAll());
-  const [settings, state, paused, flaggedTabs, framedTabs, loadTimes, tabs, extensions] = await Promise.all([
-    getSettings(), getState(), isPaused(), getFlaggedTabs(), getFramedTabs(), getLoadTimes(),
+  try {
+    await reconcileApprovals(await chrome.management.getAll());
+  } catch (err) {
+    await logError('errInternal', {}, err); // never skip turning extensions off because of this
+  }
+  const [settings, state, paused, flaggedTabs, framedTabs, prerenderTabs, loadTimes, tabs, extensions] = await Promise.all([
+    getSettings(), getState(), isPaused(), getFlaggedTabs(), getFramedTabs(), getPrerenderTabs(), getLoadTimes(),
     chrome.tabs.query({}), chrome.management.getAll(),
   ]);
   const p = plan({
-    now: Date.now(), graceMs: GRACE_MS, settings, state, paused, tabs, flaggedTabs, framedTabs, loadTimes,
-    extensions, selfId: chrome.runtime.id, ...opts,
+    now: Date.now(), graceMs: GRACE_MS, settings, state, paused, tabs, flaggedTabs, framedTabs, prerenderTabs,
+    loadTimes, extensions, selfId: chrome.runtime.id, ...opts,
   });
   const names = new Map(extensions.map((e) => [e.id, e.name]));
   const nameOf = (id) => names.get(id) || id;
@@ -333,6 +421,10 @@ async function evaluate(opts = {}) {
   const offAt = Date.now();
   const nextState = { ...p.nextState, disabledAt: { ...p.nextState.disabledAt } };
   for (const id of p.stamp) if (disabled.includes(id)) nextState.disabledAt[id] = offAt;
+  for (const id of failed) { // still on: no "off since" moment
+    if (id in state.disabledAt) nextState.disabledAt[id] = state.disabledAt[id];
+    else delete nextState.disabledAt[id];
+  }
   if (!sameJson(nextState, state)) await setState(nextState);
 
   if (disabled.length) await addLog({ type: 'disabled', names: disabled.map(nameOf), sites: nextState.activeSites });
@@ -354,8 +446,20 @@ async function evaluate(opts = {}) {
     });
   }
 
+  for (const { tabId, domain } of p.frameRace) {
+    await addLog({ type: 'frameRace', site: domain });
+    await notify(`${NOTIFY.frame}${tabId}`, {
+      title: t('frameRaceTitle'),
+      message: t('frameRaceMessage', { site: domain }),
+      buttons: [{ title: t('reloadTab') }],
+    });
+  }
+
   await setBadge(p.badge);
   p.scheduleCheck ? scheduleCheck() : cancelCheck();
+  const active = nextState.activeSites.length > 0;
+  await syncFastAudit(active);
+  if (updatePending && !active && !nextState.disabledByUs.length) chrome.runtime.reload();
   return { ...p, state: nextState, settings };
 }
 
@@ -374,10 +478,15 @@ async function protect(opts = {}) {
   return p;
 }
 
+// Every web page that is protected, by its own URL or through a protected iframe.
 async function reloadAllProtectedTabs() {
-  const [settings, flagged, tabs] = await Promise.all([getSettings(), getFlaggedTabs(), chrome.tabs.query({})]);
+  const [settings, flagged, framed, tabs] = await Promise.all([
+    getSettings(), getFlaggedTabs(), getFramedTabs(), chrome.tabs.query({}),
+  ]);
   for (const tab of tabs) {
-    if (siteForTab(tab.url, tab.id, settings, flagged)) await reloadTab(tab.id);
+    if (!/^https?:/i.test(tab.url || '')) continue; // about:blank or blob: pages would be lost
+    const viaFrame = (framed[tab.id] || []).some((host) => matchSite(host, settings.sites));
+    if (viaFrame || siteForTab(tab.url, tab.id, settings, flagged)) await reloadTab(tab.id);
   }
 }
 
@@ -387,7 +496,8 @@ async function reloadAllProtectedTabs() {
 async function protectFrame(d) {
   const host = hostOf(d.url);
   await recordFrame(d.tabId, host);
-  const { state, settings } = await protect();
+  const { state, settings, frameRace } = await protect();
+  if (frameRace.some((f) => f.tabId === d.tabId)) return; // already warned by this check
   const site = matchSite(host, settings.sites);
   const allowed = new Set([...settings.globalWhitelist, ...(site?.extra || [])]);
   const lateBy = Object.entries(state.disabledAt).some(([id, at]) => !allowed.has(id) && d.timeStamp <= at);
@@ -409,7 +519,8 @@ const isMainFrame = (d) => (d.frameType ? d.frameType === 'outermost_frame' : d.
 const isPrerender = (d) => d.documentLifecycle === 'prerender';
 // Read from storage on every frame event: an in-memory cache would be empty right after the
 // service worker wakes up, which is exactly when the first frame event arrives.
-const isSubFrame = (d) => (d.frameType ? d.frameType === 'sub_frame' : d.frameId !== 0);
+// Everything else is a sub-frame, fenced frames included.
+const isSubFrame = (d) => (d.frameType ? d.frameType !== 'outermost_frame' : d.frameId !== 0);
 async function isProtectedHost(url) {
   return !!matchSite(hostOf(url), (await getSettings()).sites);
 }
@@ -419,7 +530,11 @@ chrome.webNavigation.onBeforeNavigate.addListener((d) => {
   if (isMainFrame(d)) {
     // A prerender can't be restarted, but extensions can already be turned off for it.
     const navigation = isPrerender(d) ? undefined : { tabId: d.tabId, url: d.url };
-    run(() => protect({ extraUrls: [d.url], navigation }));
+    run(async () => {
+      // Keep protection on for as long as the prerendered page exists, not just this once.
+      if (isPrerender(d) && await isProtectedHost(d.url)) await recordPrerender(d.tabId, hostOf(d.url));
+      await protect({ extraUrls: [d.url], navigation });
+    });
   } else if (isSubFrame(d)) {
     run(async () => {
       if (await isProtectedHost(d.url)) await protect({ extraUrls: [d.url] });
@@ -430,10 +545,15 @@ chrome.webNavigation.onBeforeNavigate.addListener((d) => {
 chrome.webNavigation.onCommitted.addListener((d) => {
   if (isMainFrame(d) && !isPrerender(d)) {
     run(async () => {
-      await recordLoad(d.tabId);
+      await recordLoad(d.tabId, d.timeStamp);
       await forgetTab(d.tabId, d.url);
+      // Back/forward: frames that already exist belong to a document restored from the
+      // back/forward cache; they loaded earlier, possibly while other extensions were on.
+      if (d.transitionQualifiers?.includes('forward_back')) {
+        for (const host of await rescanFrames(d.tabId)) await protectFrame({ tabId: d.tabId, url: `https://${host}/`, timeStamp: 0 });
+      }
+      await protect({ extraUrls: [d.url] }); // also records this host for "log out when leaving"
     });
-    requestCheck();
   } else if (isSubFrame(d)) {
     run(async () => {
       if (await isProtectedHost(d.url)) await protectFrame(d);
@@ -453,8 +573,8 @@ chrome.tabs.onRemoved.addListener((tabId) => {
   });
 });
 
-chrome.tabs.onReplaced.addListener((_added, removed) => {
-  run(() => forgetTab(removed));
+chrome.tabs.onReplaced.addListener((added, removed) => {
+  run(() => replaceTab(added, removed));
   requestCheck();
 });
 
@@ -492,7 +612,7 @@ chrome.permissions.onRemoved.addListener(() => {
 });
 
 chrome.alarms.onAlarm.addListener((alarm) => {
-  if (alarm.name === CHECK_ALARM || alarm.name === AUDIT_ALARM) requestCheck();
+  if ([CHECK_ALARM, AUDIT_ALARM, FAST_AUDIT_ALARM].includes(alarm.name)) requestCheck();
 });
 
 chrome.notifications.onClicked.addListener((id) => {
@@ -503,13 +623,21 @@ chrome.notifications.onButtonClicked.addListener((id) => {
   if (id.startsWith(NOTIFY.frame)) run(() => reloadTab(Number(id.slice(NOTIFY.frame.length))));
 });
 
+chrome.runtime.onUpdateAvailable.addListener(() => {
+  updatePending = true;
+  requestCheck();
+});
+
 // Content scripts don't need extension storage (the detector gets its mode from a file), so
-// keep settings, the site list and the log out of reach of web renderers where Chrome allows it.
+// keep settings, the site list and the log out of reach of web renderers. If Chrome refuses,
+// the detector is not injected at all (see syncDetector).
 async function restrictStorage() {
   try {
     await chrome.storage.local.setAccessLevel({ accessLevel: 'TRUSTED_CONTEXTS' });
+    storageRestricted = true;
   } catch (err) {
-    console.info('[Exterminator] storage.local access level not adjustable here:', err?.message);
+    storageRestricted = false;
+    console.warn('[Exterminator] storage.local could not be restricted:', err?.message);
   }
 }
 
@@ -521,7 +649,15 @@ async function boot() {
   await restrictStorage();
   if (await isBooted()) return;
   await migrate();
-  await syncDetector(await getSettings());
+  try {
+    // After an update or restart, what we knew about open pages is gone: rebuild it before the
+    // first check, so tabs protected by a frame or a detected field don't lose protection.
+    const js = await syncDetector(await getSettings());
+    if (js) await injectDetector(js);
+    for (const tab of await chrome.tabs.query({})) await rescanFrames(tab.id);
+  } catch (err) {
+    await logError('errInternal', {}, err);
+  }
   await chrome.alarms.create(AUDIT_ALARM, { periodInMinutes: AUDIT_MINUTES });
   await markBooted();
   await protect();

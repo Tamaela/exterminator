@@ -249,7 +249,7 @@
     "message": "Sure? High risk"
   },
   "pausedStatus": {
-    "message": "⏸ Paused until you leave all protected pages."
+    "message": "⏸ Paused for {sites} (at most one hour). Leaving these sites or opening another protected site ends the pause."
   },
   "activeStatus": {
     "message": "Protected mode active ({sites})"
@@ -454,5 +454,17 @@
   },
   "tipFrames": {
     "message": "A protected site loaded inside another page (for example a bank's payment frame in a web shop) also turns protection on."
+  },
+  "logCleanupIncognito": {
+    "message": "Incognito cookies and site data for {site} could not be cleared; close all incognito windows to remove them"
+  },
+  "logStorageUnrestricted": {
+    "message": "Chrome could not shield settings from web pages, so automatic field detection stays off"
+  },
+  "storageUnrestrictedTitle": {
+    "message": "Field detection disabled for safety"
+  },
+  "storageUnrestrictedMessage": {
+    "message": "This Chrome version cannot keep Exterminator's settings out of reach of web pages, so the field detector is not injected. Protection for your configured sites still works."
   }
 }

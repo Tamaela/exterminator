@@ -10,6 +10,13 @@ test('hostOf ignores non-web URLs', () => {
   assert.equal(hostOf('not a url'), null);
 });
 
+test('audit fix: blob: and filesystem: URLs belong to their web origin', () => {
+  assert.equal(hostOf('blob:https://MyBank.com/1f2e'), 'mybank.com');
+  assert.equal(hostOf('filesystem:https://mybank.com/temporary/x'), 'mybank.com');
+  assert.equal(hostOf('blob:null/1f2e'), null);
+  assert.equal(hostOf('about:blank'), null);
+});
+
 test('trailing dot cannot bypass matching', () => {
   assert.equal(hostOf('https://mybank.com./x'), 'mybank.com');
   assert.equal(matchSite(hostOf('https://mybank.com./'), sites)?.domain, 'mybank.com');

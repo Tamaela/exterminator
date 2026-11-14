@@ -21,7 +21,8 @@ sure only the ones you trust are running there.
 - **Intrusion alerts** — an extension turned on during protected mode is turned off again and you
   get a notification offering to reload protected tabs.
 - **After leaving** *(optional)* — log out by clearing a site's cookies and data, and clear the clipboard.
-- **Activity log**, incognito warning, pause button.
+- **Activity log**, incognito warning, pause button. A pause covers only the protected sites open
+  when you press it, ends when you leave them or open another protected site, and lasts at most an hour.
 
 ## Install (developer mode)
 
@@ -68,8 +69,17 @@ so a tab that becomes protected is reloaded if it was loaded while those extensi
 - Removing or disabling Exterminator while protected mode is active leaves the other
   extensions off (Chrome runs no code on uninstall).
 - Restarting a navigation into a protected site turns a form POST into a GET.
-- Fields inside *closed* Shadow DOM can't be seen by any extension; web components that attach
-  a shadow root long after the page loaded are caught when you focus the field.
+- Fields inside open and *closed* Shadow DOM are detected (extensions can read both, so the
+  detector looks at both). Web components that attach a shadow root long after the page loaded
+  are caught by late scans or when you focus the field.
+- Protection turns *other* extensions off, including protective ones such as an ad blocker. Put
+  extensions you rely on for safety on "Always on", otherwise a page that loads a protected site
+  in an iframe can turn them off for as long as it stays open.
+- "Log out when leaving" can't clear incognito data (Chrome doesn't allow it); the log says so.
+  Closing all incognito windows removes it.
+- If Chrome can't keep Exterminator's settings out of reach of web pages, automatic field
+  detection stays off and you get a notification; configured sites are still protected.
+- An update of Exterminator waits until protected mode is off.
 - An "Always on" extension is fully trusted on protected pages.
 - A protected site inside an iframe turns protection on as soon as the frame starts loading.
   The frame is not reloaded automatically (it may be a payment step); if it loaded before

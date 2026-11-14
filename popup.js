@@ -2,7 +2,7 @@ import { t, localizePage } from './lib/i18n.js';
 import { suggestDomain } from './lib/domains.js';
 import { describeTab } from './lib/planner.js';
 import { riskOf } from './lib/risk.js';
-import { KEYS, getSettings, getState, isPaused, setPaused, getAlerts, getFlaggedTabs, actions } from './lib/storage.js';
+import { KEYS, getSettings, getState, isPaused, setPaused, pauseFor, getAlerts, getFlaggedTabs, actions } from './lib/storage.js';
 import { el, readDomain, onStorageChange } from './lib/ui.js';
 
 localizePage();
@@ -89,7 +89,7 @@ function allowButton(ext) {
 function renderStatus(paused, state, byId) {
   statusEl.replaceChildren();
   if (paused) {
-    statusEl.append(el('p', { className: 'warn', textContent: t('pausedStatus') }));
+    statusEl.append(el('p', { className: 'warn', textContent: t('pausedStatus', { sites: paused.sites.join(', ') }) }));
   } else if (state.activeSites.length) {
     const ids = state.disabledByUs;
     statusEl.append(
@@ -123,7 +123,10 @@ async function render() {
   renderStatus(paused, state, new Map(exts.map((e) => [e.id, e])));
 }
 
-pauseBtn.addEventListener('click', async () => setPaused(!(await isPaused())));
+pauseBtn.addEventListener('click', async () => {
+  if (await isPaused()) await setPaused(false);
+  else await pauseFor((await getState()).activeSites);
+});
 document.getElementById('open-options').addEventListener('click', (e) => {
   e.preventDefault();
   chrome.runtime.openOptionsPage();

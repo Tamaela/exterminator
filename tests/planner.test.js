@@ -152,11 +152,65 @@ test('clipboard is cleared once, when protection ends', () => {
 });
 
 test('pause restores immediately and lifts itself once you leave', () => {
-  const paused = plan(input({ state: activeState(), paused: true, tabs: [{ id: 1, url: 'https://bank.com/' }] }));
+  const pause = { sites: ['bank.com'], until: NOW + 60_000 };
+  const paused = plan(input({ state: activeState(), paused: pause, tabs: [{ id: 1, url: 'https://bank.com/' }] }));
   assert.deepEqual(paused.enable.sort(), ['ads', 'grammar']);
   assert.equal(paused.badge.mode, 'pause');
   assert.equal(paused.unpause, false);
-  assert.equal(plan(input({ paused: true })).unpause, true);
+  assert.equal(plan(input({ paused: pause })).unpause, true);
+});
+
+test('audit fix: a pause covers only the sites it was started on, and expires', () => {
+  const pause = { sites: ['bank.com'], until: NOW + 60_000 };
+  const tabs = [{ id: 1, url: 'https://bank.com/' }, { id: 2, url: 'https://tax.gov/' }];
+  const other = plan(input({ paused: pause, tabs }));
+  assert.equal(other.unpause, true, 'opening another protected site ends the pause');
+  assert.deepEqual(other.disable.sort(), ['ads', 'grammar']);
+  const expired = plan(input({ now: NOW + 60_000, paused: pause, tabs: [tabs[0]] }));
+  assert.equal(expired.unpause, true);
+  assert.equal(expired.badge.mode, 'on');
+  assert.equal(plan(input({ paused: true, tabs: [tabs[0]] })).badge.mode, 'on', 'an old global pause is ignored');
+});
+
+test('audit fix: a later, stricter disable warns about tabs protected only through an iframe', () => {
+  const settings = normalizeSettings({ sites: [{ domain: 'bank.com', extra: ['E'] }, { domain: 'tax.gov' }], globalWhitelist: [] });
+  const framed = plan(input({ settings, extensions: [ext('E')], tabs: [{ id: 5, url: 'https://shop.com/' }], framedTabs: { 5: ['acs.bank.com'] } }));
+  assert.deepEqual(framed.disable, [], 'E is allowed on bank.com');
+  const stricter = plan(input({ settings, extensions: [ext('E')], state: framed.nextState,
+    tabs: [{ id: 5, url: 'https://shop.com/' }, { id: 6, url: 'https://tax.gov/' }], framedTabs: { 5: ['acs.bank.com'] }, loadTimes: { 6: 1 } }));
+  assert.deepEqual(stricter.disable, ['E']);
+  assert.deepEqual(stricter.frameRace, [], 'E is still allowed on bank.com: no warning');
+  const settings2 = normalizeSettings({ sites: [{ domain: 'bank.com' }], globalWhitelist: [] });
+  const s1 = plan(input({ settings: settings2, extensions: [ext('E')], tabs: [{ id: 5, url: 'https://shop.com/' }], framedTabs: { 5: ['acs.bank.com'] } }));
+  assert.deepEqual(s1.frameRace, [{ tabId: 5, domain: 'bank.com' }]);
+  assert.deepEqual(s1.reloadTabIds, [], 'never reloaded automatically');
+});
+
+test('audit fix: a protected page being prerendered keeps protection on', () => {
+  const p = plan(input({ tabs: [{ id: 3, url: 'https://search.com/' }], prerenderTabs: { 3: ['bank.com'] } }));
+  assert.deepEqual(p.nextState.activeSites, ['bank.com']);
+  assert.deepEqual(p.reloadTabIds, []);
+});
+
+test('audit fix: an about:blank popup of a protected page and a blob: page count as protected, without reloads', () => {
+  const tabs = [{ id: 1, url: 'https://news.com/' }, { id: 2, url: 'about:blank', openerTabId: 9 }, { id: 9, url: 'https://bank.com/', incognito: false }];
+  const popup = plan(input({ tabs: tabs.slice(1), loadTimes: { 9: NOW + 1 } }));
+  assert.deepEqual(popup.nextState.activeSites, ['bank.com']);
+  const closedOpener = plan(input({ tabs: [tabs[1]] }));
+  assert.equal(closedOpener.badge.mode, 'off', 'without a protected opener it is not protected');
+  const blob = plan(input({ tabs: [{ id: 4, url: 'blob:https://bank.com/0b1c' }] }));
+  assert.deepEqual(blob.nextState.activeSites, ['bank.com']);
+  assert.deepEqual(blob.reloadTabIds, [], 'a blob: page would be lost by a reload');
+});
+
+test('audit fix: cleanup says when a site was visited in incognito', () => {
+  const settings = normalizeSettings({ sites: [{ domain: 'bank.com', cleanup: true }] });
+  const visiting = plan(input({ settings, tabs: [{ id: 1, url: 'https://bank.com/', incognito: true }] }));
+  assert.deepEqual(visiting.nextState.incognitoSites, ['bank.com']);
+  const left = plan(input({ settings, state: visiting.nextState }));
+  const later = plan(input({ now: NOW + GRACE, settings, state: left.nextState }));
+  assert.deepEqual(later.cleanup, [{ domain: 'bank.com', hosts: ['bank.com', 'www.bank.com'], incognito: true }]);
+  assert.deepEqual(later.nextState.incognitoSites, []);
 });
 
 test('several protected sites: only extensions allowed on all of them stay on', () => {

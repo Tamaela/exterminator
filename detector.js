@@ -5,6 +5,10 @@
 // Cost model: one full scan when the page starts, at DOMContentLoaded/load and a few times
 // after; in between only the nodes that were actually added or changed are examined.
 (() => {
+  // Injected again into already-open pages after Exterminator restarts: run only once.
+  if (globalThis.__exterminatorDetector === true) return;
+  globalThis.__exterminatorDetector = true;
+
   const PASSWORD = 'input[type="password" i]';
   const SENSITIVE_AUTOCOMPLETE = new Set([
     'cc-number', 'cc-csc', 'cc-exp', 'cc-exp-month', 'cc-exp-year', 'one-time-code',
@@ -20,7 +24,29 @@
   // Late full scans catch web components that attach a shadow root after being inserted.
   const LATE_SCANS_MS = [1000, 3000, 10000];
 
-  const sensitive = !!globalThis.__exterminatorExtended;
+  // Strict check: a page element named "__exterminatorExtended" must not count as true.
+  const sensitive = globalThis.__exterminatorExtended === true;
+  // Content scripts can open closed shadow roots too; other extensions can, so we must look.
+  const openOrClosed = globalThis.chrome?.dom?.openOrClosedShadowRoot;
+  const shadowOf = (el) => {
+    if (el.shadowRoot) return el.shadowRoot;
+    try {
+      return openOrClosed ? openOrClosed(el) || null : null;
+    } catch {
+      return null;
+    }
+  };
+  // Text fields shown as dots via CSS (-webkit-text-security), e.g. PIN fields.
+  const MASKABLE = 'input:not([type]), input[type="text" i], input[type="tel" i], input[type="number" i]';
+  const isMasked = (input) => {
+    try {
+      const style = getComputedStyle(input);
+      const mask = style.webkitTextSecurity || style.getPropertyValue('-webkit-text-security');
+      return !!mask && mask !== 'none';
+    } catch {
+      return false;
+    }
+  };
   let reported = false;
   let found = false;
   // True for a document that is shown again (back/forward cache) or was prerendered:
@@ -30,6 +56,7 @@
 
   function isSensitiveInput(input) {
     if (input.type?.toLowerCase() === 'password') return true;
+    if (input.matches(MASKABLE) && isMasked(input)) return true;
     if (!sensitive) return false;
     const tokens = (input.getAttribute('autocomplete') || '').toLowerCase().split(/\s+/);
     if (tokens.some((token) => SENSITIVE_AUTOCOMPLETE.has(token))) return true;
@@ -55,19 +82,24 @@
     observer.observe(shadowRoot, OBSERVE); // mutations inside shadow roots aren't seen otherwise
   }
 
-  // Searches a node (element, document or shadow root) including open shadow roots inside it.
+  // Searches a node (element, document or shadow root) including open and closed shadow roots.
   function scan(node) {
     if (node instanceof HTMLInputElement && isSensitiveInput(node)) return true;
     if (!node.querySelectorAll) return false;
     if (node.querySelector(PASSWORD)) return true;
-    if (sensitive) {
-      for (const input of node.querySelectorAll('input')) if (isSensitiveInput(input)) return true;
+    for (const input of node.querySelectorAll(sensitive ? 'input' : MASKABLE)) {
+      if (isSensitiveInput(input)) return true;
     }
-    const hosts = node.shadowRoot ? [node] : [];
-    for (const child of node.querySelectorAll('*')) if (child.shadowRoot) hosts.push(child);
-    for (const host of hosts) {
-      watch(host.shadowRoot);
-      if (scan(host.shadowRoot)) return true;
+    const roots = [];
+    const own = node instanceof Element ? shadowOf(node) : null;
+    if (own) roots.push(own);
+    for (const child of node.querySelectorAll('*')) {
+      const root = shadowOf(child);
+      if (root) roots.push(root);
+    }
+    for (const root of roots) {
+      watch(root);
+      if (scan(root)) return true;
     }
     return false;
   }
@@ -104,10 +136,16 @@
   });
   document.addEventListener('prerenderingchange', rearm, { once: true }); // prerender activated
 
-  // Safety net: focusing a field, also inside a shadow root (composedPath reveals the real field).
+  // Safety net: focusing a field, also inside a shadow root. composedPath reveals the real
+  // field in an open root; for a closed root it stops at the host, so scan that host.
   document.addEventListener('focusin', (e) => {
     const target = e.composedPath()[0];
-    if (target instanceof HTMLInputElement && isSensitiveInput(target)) report();
+    if (target instanceof HTMLInputElement) {
+      if (isSensitiveInput(target)) report();
+    } else if (target instanceof Element) {
+      const root = shadowOf(target);
+      if (root && scan(root)) report();
+    }
   }, true);
 
   document.addEventListener('DOMContentLoaded', fullScan, { once: true });

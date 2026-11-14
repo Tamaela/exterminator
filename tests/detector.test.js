@@ -108,3 +108,51 @@ test('audit fix: a prerendered page waits until it is shown, then reports as reu
 test('the detector no longer touches chrome.storage', () => {
   assert.equal(/chrome\.storage\./.test(code), false);
 });
+
+// chrome.dom.openOrClosedShadowRoot, as Chrome gives it to content scripts.
+const withClosedRoots = (w) => {
+  const roots = new WeakMap();
+  const attach = w.Element.prototype.attachShadow;
+  w.Element.prototype.attachShadow = function (init) {
+    const root = attach.call(this, init);
+    roots.set(this, root);
+    return root;
+  };
+  w.chrome.dom = { openOrClosedShadowRoot: (el) => roots.get(el) };
+};
+
+test('audit fix: password inside a closed shadow root is detected', async () => {
+  const before = (w) => {
+    withClosedRoots(w);
+    addPassword(w.document.getElementById('h').attachShadow({ mode: 'closed' }), w.document);
+  };
+  assert.equal(await count('<div id="h"></div>', { before }), 1);
+});
+
+test('audit fix: password added later inside a closed shadow root is detected', async () => {
+  let root;
+  const before = (w) => {
+    withClosedRoots(w);
+    root = w.document.getElementById('h').attachShadow({ mode: 'closed' });
+  };
+  assert.equal(await count('<div id="h"></div>', { before, act: (w) => addPassword(root, w.document) }), 1);
+});
+
+test('audit fix: a text field masked with -webkit-text-security counts as a password field', async () => {
+  const before = (w) => {
+    const real = w.getComputedStyle.bind(w);
+    w.getComputedStyle = (el) => (el.id === 'pin' ? { webkitTextSecurity: 'disc', getPropertyValue: () => 'disc' } : real(el));
+  };
+  assert.equal(await count('<input id="pin" type="tel"><input id="name">', { before }), 1);
+  assert.equal(await count('<input id="name">'), 0);
+});
+
+test('audit fix: injecting the detector twice into the same page reports once', async () => {
+  const before = (w) => w.eval(code); // e.g. registered script plus re-injection after a restart
+  assert.equal(await count('<input type="password">', { before }), 1);
+});
+
+test('a page element named __exterminatorExtended does not switch on extended mode', async () => {
+  const before = (w) => { w.__exterminatorExtended = w.document.createElement('a'); };
+  assert.equal(await count('<input autocomplete="cc-number">', { before }), 0);
+});

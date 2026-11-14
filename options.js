@@ -1,7 +1,7 @@
 import { t, localizePage } from './lib/i18n.js';
 import { riskOf, describePermission, canManageExtensions, sortByRisk } from './lib/risk.js';
 import {
-  KEYS, getSettings, getAlerts, setAlerts, getLog, clearLog, logText, actions,
+  KEYS, getSettings, getAlerts, getLog, clearLog, logText, actions,
 } from './lib/storage.js';
 import { el, readDomain, onStorageChange } from './lib/ui.js';
 
@@ -90,7 +90,6 @@ const policyLock = (ext) => (!ext.mayDisable ? { checked: true, note: t('managed
 
 function renderAlerts(alerts) {
   $('alerts-card').hidden = !alerts.length;
-  const dismiss = (id) => setAlerts(alerts.filter((a) => a.id !== id));
   $('alerts').replaceChildren(...alerts.map((a) => el('li', {},
     el('div', {},
       el('strong', { textContent: `${a.name} ${a.version}` }),
@@ -99,12 +98,9 @@ function renderAlerts(alerts) {
       el('button', {
         className: 'secondary small',
         textContent: t('allowAgain'),
-        onclick: async () => {
-          await dismiss(a.id);
-          await actions.restoreAllowlists(a.id, a.where);
-        },
+        onclick: () => actions.allowAgain(a.id),
       }),
-      el('button', { className: 'secondary small', textContent: t('dismiss'), onclick: () => dismiss(a.id) })))));
+      el('button', { className: 'secondary small', textContent: t('dismiss'), onclick: () => actions.dismissAlert(a.id) })))));
 }
 
 function renderExclusions(settings) {
