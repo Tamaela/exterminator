@@ -8,7 +8,7 @@
   "scripts": {
     "test": "node --test \"tests/**/*.test.js\"",
     "test:chrome": "node --test --test-concurrency=1 \"tests/e2e/*.e2e.js\"",
-    "icons": "python3 tools/make-icons.py icons",
+    "icons": "python3 tools/make-icons.py icons dist/store-icon-128.png",
     "package": "sh tools/package.sh",
     "preview": "python3 -m http.server 8766 --bind 127.0.0.1",
     "screenshots": "node tools/screenshots/make.js"
