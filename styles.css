@@ -151,3 +151,16 @@ code { font-family: ui-monospace, monospace; font-size: 0.92em; }
 .plain-list li { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 4px 0; border-top: 1px solid var(--border); }
 .plain-list .domain { font-family: ui-monospace, monospace; }
 .popup #site button.small { margin-bottom: 6px; }
+
+/* Inline confirmation */
+.ext-list li { flex-wrap: wrap; }
+.confirm {
+  flex-basis: 100%;
+  margin: 6px 0 4px 24px;
+  padding: 8px 10px;
+  border: 1px solid color-mix(in srgb, var(--error) 50%, var(--border));
+  border-radius: 8px;
+  font-size: 13px;
+}
+.confirm p { margin: 0 0 8px; }
+.log li.error span { color: var(--error); }

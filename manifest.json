@@ -1,8 +1,10 @@
 {
   "manifest_version": 3,
-  "name": "Exterminator",
-  "version": "0.3.0",
-  "description": "Automatically disables other extensions on sensitive websites (like your bank) and turns them back on when you leave.",
+  "name": "__MSG_extName__",
+  "version": "0.4.0",
+  "description": "__MSG_extDescription__",
+  "default_locale": "en",
+  "minimum_chrome_version": "120",
   "permissions": [
     "management",
     "tabs",
@@ -14,12 +16,16 @@
     "offscreen",
     "notifications"
   ],
+  "optional_host_permissions": [
+    "http://*/*",
+    "https://*/*"
+  ],
   "background": {
     "service_worker": "background.js",
     "type": "module"
   },
   "action": {
-    "default_title": "Exterminator",
+    "default_title": "__MSG_extName__",
     "default_popup": "popup.html",
     "default_icon": {
       "16": "icons/icon16.png",
@@ -36,9 +42,5 @@
     "32": "icons/icon32.png",
     "48": "icons/icon48.png",
     "128": "icons/icon128.png"
-  },
-  "optional_host_permissions": [
-    "http://*/*",
-    "https://*/*"
-  ]
+  }
 }

@@ -1,0 +1,437 @@
+{
+  "extName": {
+    "message": "Exterminator"
+  },
+  "extDescription": {
+    "message": "Automatically disables other extensions on sensitive websites (like your bank) and turns them back on when you leave."
+  },
+  "badgeOnTitle": {
+    "message": "Exterminator: protected mode active ({count} extension(s) turned off)"
+  },
+  "badgePausedTitle": {
+    "message": "Exterminator: paused"
+  },
+  "alertTitle": {
+    "message": "{name} is no longer \"Always on\""
+  },
+  "alertMessage": {
+    "message": "Reason: {detail}. Review this in the Exterminator settings."
+  },
+  "alertDetail": {
+    "message": "new permissions after update to {version}: {permissions}"
+  },
+  "intrusionTitle": {
+    "message": "Extension turned on during protected mode"
+  },
+  "intrusionMessage": {
+    "message": "{names} was turned off again. Reload your protected tabs to be safe."
+  },
+  "reloadProtectedTabs": {
+    "message": "Reload protected tabs"
+  },
+  "clipboardJustification": {
+    "message": "Clear the clipboard after leaving a protected page"
+  },
+  "logDisabled": {
+    "message": "Turned off {count} extension(s) ({sites}): {names}"
+  },
+  "logEnabled": {
+    "message": "Turned {count} extension(s) back on: {names}"
+  },
+  "logCleanup": {
+    "message": "Cleared cookies and site data for {site}"
+  },
+  "logClipboard": {
+    "message": "Clipboard cleared"
+  },
+  "logDetected": {
+    "message": "Sensitive field found on {site}"
+  },
+  "logAlert": {
+    "message": "{name} removed from \"Always on\": {detail}"
+  },
+  "logIntrusion": {
+    "message": "Turned on during protected mode and turned off again: {names}"
+  },
+  "logError": {
+    "message": "Error while {context}: {message}"
+  },
+  "errEnable": {
+    "message": "turning on {name}"
+  },
+  "errDisable": {
+    "message": "turning off {name}"
+  },
+  "errCleanup": {
+    "message": "clearing data for {site}"
+  },
+  "errClipboard": {
+    "message": "clearing the clipboard"
+  },
+  "errReload": {
+    "message": "reloading a tab"
+  },
+  "errNotify": {
+    "message": "showing a notification"
+  },
+  "errInternal": {
+    "message": "running a background task"
+  },
+  "risk_high": {
+    "message": "high risk"
+  },
+  "risk_medium": {
+    "message": "medium risk"
+  },
+  "risk_low": {
+    "message": "low risk"
+  },
+  "riskNone": {
+    "message": "No sensitive permissions"
+  },
+  "riskAllSites": {
+    "message": "can read and change all websites"
+  },
+  "riskSomeSites": {
+    "message": "access to {count} specific website(s)"
+  },
+  "permAllSites": {
+    "message": "access to all websites"
+  },
+  "permHost": {
+    "message": "access to {pattern}"
+  },
+  "permUnknown": {
+    "message": "permission \"{name}\""
+  },
+  "perm_debugger": {
+    "message": "can fully control tabs (debugger)"
+  },
+  "perm_webRequest": {
+    "message": "can read network traffic and submitted forms"
+  },
+  "perm_webRequestBlocking": {
+    "message": "can intercept and modify network traffic"
+  },
+  "perm_cookies": {
+    "message": "can read cookies and login sessions"
+  },
+  "perm_management": {
+    "message": "can turn other extensions on and off"
+  },
+  "perm_nativeMessaging": {
+    "message": "can communicate with programs on your computer"
+  },
+  "perm_proxy": {
+    "message": "can reroute all your internet traffic"
+  },
+  "perm_scripting": {
+    "message": "can inject scripts into pages"
+  },
+  "perm_tabs": {
+    "message": "can see the addresses of all your tabs"
+  },
+  "perm_clipboardRead": {
+    "message": "can read your clipboard"
+  },
+  "perm_history": {
+    "message": "can read your browsing history"
+  },
+  "perm_webNavigation": {
+    "message": "can see where you navigate"
+  },
+  "perm_desktopCapture": {
+    "message": "can record your screen"
+  },
+  "perm_tabCapture": {
+    "message": "can record tabs"
+  },
+  "perm_declarativeNetRequestWithHostAccess": {
+    "message": "can modify requests to websites"
+  },
+  "perm_storage": {
+    "message": "store data"
+  },
+  "perm_alarms": {
+    "message": "schedule tasks"
+  },
+  "perm_notifications": {
+    "message": "show notifications"
+  },
+  "perm_contextMenus": {
+    "message": "add items to the right-click menu"
+  },
+  "perm_activeTab": {
+    "message": "access the current tab after a click"
+  },
+  "perm_downloads": {
+    "message": "manage downloads"
+  },
+  "perm_bookmarks": {
+    "message": "read and change bookmarks"
+  },
+  "perm_identity": {
+    "message": "sign in with your Google account"
+  },
+  "perm_offscreen": {
+    "message": "use hidden documents"
+  },
+  "perm_sidePanel": {
+    "message": "show a side panel"
+  },
+  "perm_unlimitedStorage": {
+    "message": "store unlimited data"
+  },
+  "perm_clipboardWrite": {
+    "message": "write to your clipboard"
+  },
+  "perm_declarativeNetRequest": {
+    "message": "block or modify requests to websites"
+  },
+  "perm_privacy": {
+    "message": "change privacy settings"
+  },
+  "perm_geolocation": {
+    "message": "request your location"
+  },
+  "perm_idle": {
+    "message": "detect whether you are using your computer"
+  },
+  "perm_topSites": {
+    "message": "read your most visited sites"
+  },
+  "popupIncognito": {
+    "message": "⚠ Exterminator does not run in Incognito. Turn on \"Allow in Incognito\" for Exterminator in chrome://extensions."
+  },
+  "popupAlerts": {
+    "message": "⚠ {count} extension(s) removed from \"Always on\" after a permission change. Check the settings."
+  },
+  "cannotProtect": {
+    "message": "This page cannot be protected."
+  },
+  "autoOffFor": {
+    "message": "Automatic protection is off for {domain}."
+  },
+  "turnBackOn": {
+    "message": "Turn back on"
+  },
+  "detectedProtected": {
+    "message": "🔑 Temporarily protected: sensitive field found"
+  },
+  "neverAutoProtect": {
+    "message": "Never auto-protect this site"
+  },
+  "protectedSite": {
+    "message": "✓ Protected site"
+  },
+  "protectedVia": {
+    "message": "✓ Protected via {domain}"
+  },
+  "logOutWhenLeaving": {
+    "message": "Log out when leaving (clear cookies and site data)"
+  },
+  "removeProtection": {
+    "message": "Remove protection"
+  },
+  "invalidDomain": {
+    "message": "Invalid domain, for example: mybank.com"
+  },
+  "domainLabel": {
+    "message": "Domain (includes subdomains)"
+  },
+  "protectThisSite": {
+    "message": "🛡 Protect this site"
+  },
+  "alwaysOn": {
+    "message": "Always on"
+  },
+  "sureHighRisk": {
+    "message": "Sure? High risk"
+  },
+  "pausedStatus": {
+    "message": "⏸ Paused until you leave all protected pages."
+  },
+  "activeStatus": {
+    "message": "Protected mode active ({sites})"
+  },
+  "disabledCount": {
+    "message": "{count} extension(s) temporarily turned off:"
+  },
+  "disabledNone": {
+    "message": "No extensions turned off."
+  },
+  "notActive": {
+    "message": "Protected mode not active."
+  },
+  "resume": {
+    "message": "Resume protection"
+  },
+  "pause": {
+    "message": "Pause"
+  },
+  "settingsLink": {
+    "message": "Settings"
+  },
+  "optionsTitle": {
+    "message": "Exterminator – Settings"
+  },
+  "incognitoWarningHtml": {
+    "message": "<strong>⚠ Not protected in Incognito.</strong> If other extensions are allowed in Incognito, they simply stay on on your bank there. Go to <code>chrome://extensions</code>, click \"Details\" for Exterminator and turn on \"Allow in Incognito\"."
+  },
+  "alertsHeading": {
+    "message": "⚠ Removed from \"Always on\""
+  },
+  "alertsIntro": {
+    "message": "These extensions gained new permissions after an update. They will be turned off on protected pages again until you re-approve them."
+  },
+  "newPermissions": {
+    "message": "New permissions: {list}"
+  },
+  "allowAgain": {
+    "message": "Allow again"
+  },
+  "dismiss": {
+    "message": "Dismiss"
+  },
+  "sitesHeading": {
+    "message": "Protected sites"
+  },
+  "sitesIntro": {
+    "message": "On these sites (and their subdomains) all extensions are turned off, except the allowed ones. Protected mode stays active as long as a tab of a protected site is open anywhere."
+  },
+  "domainPlaceholder": {
+    "message": "e.g. mybank.com"
+  },
+  "add": {
+    "message": "Add"
+  },
+  "noSites": {
+    "message": "No sites yet. Add one above, or click the Exterminator icon while on a site."
+  },
+  "remove": {
+    "message": "Remove"
+  },
+  "alsoOnForSite": {
+    "message": "Also on for this site ({count})"
+  },
+  "autoHeading": {
+    "message": "Automatic protection"
+  },
+  "fieldDetectionLabel": {
+    "message": "Protect every page with a password field"
+  },
+  "fieldDetectionHelpHtml": {
+    "message": "Extensions are also turned off on sites that aren't in your list (only \"Always on\" stays on). The tab stays protected until you leave that website. Chrome will ask for access to all websites for this; Exterminator only checks <em>whether</em> such a field exists and reads nothing else."
+  },
+  "detectionDenied": {
+    "message": "Without access to websites, Exterminator cannot detect sensitive fields."
+  },
+  "sensitiveLabel": {
+    "message": "Other sensitive fields too"
+  },
+  "sensitiveHelp": {
+    "message": "Credit card number, CVC, expiry date, one-time codes (2FA), IBAN and social security / national ID numbers."
+  },
+  "exceptionsLabel": {
+    "message": "Exceptions"
+  },
+  "exceptionsHelp": {
+    "message": "Sensitive fields on these sites (and their subdomains) never trigger protection, for example sites with a hidden login form on every page. Sites in your protected list are always protected."
+  },
+  "exclusionPlaceholder": {
+    "message": "e.g. example.com"
+  },
+  "noExceptions": {
+    "message": "No exceptions."
+  },
+  "afterHeading": {
+    "message": "After leaving"
+  },
+  "clipboardLabel": {
+    "message": "Clear clipboard"
+  },
+  "clipboardHelp": {
+    "message": "The clipboard is emptied before extensions come back, so a copied password or account number can't be read. Note: this also happens if you meant to paste something on another site."
+  },
+  "cleanupHelpHtml": {
+    "message": "For each site above you can also turn on <strong>Log out when leaving</strong>: the site's cookies and site data are then cleared, so extensions can't take over your session."
+  },
+  "alwaysOnHeading": {
+    "message": "Always on"
+  },
+  "alwaysOnIntroHtml": {
+    "message": "These extensions stay on on <strong>all</strong> protected pages (including pages with sensitive fields), for example your password manager. Everything else, including newly installed extensions, is turned off. If an extension here gains new permissions after an update, it is removed from this list automatically."
+  },
+  "sortBy": {
+    "message": "Sort by"
+  },
+  "sortRiskDesc": {
+    "message": "Risk (highest first)"
+  },
+  "sortRiskAsc": {
+    "message": "Risk (lowest first)"
+  },
+  "sortName": {
+    "message": "Name"
+  },
+  "riskLegendNote": {
+    "message": "based on the extension's permissions"
+  },
+  "noOtherExtensions": {
+    "message": "No other extensions installed."
+  },
+  "managedByPolicy": {
+    "message": "managed by policy, cannot be turned off"
+  },
+  "alwaysOnNote": {
+    "message": "always on"
+  },
+  "turnedOff": {
+    "message": "turned off"
+  },
+  "confirmHighRisk": {
+    "message": "\"{name}\" is high risk: {reasons}. It will be able to read along on your protected pages."
+  },
+  "confirmManageNote": {
+    "message": "It can also turn other extensions on; Exterminator turns those off again right away, but only trust it if you are sure it is reliable."
+  },
+  "keepOnAnyway": {
+    "message": "Keep on anyway"
+  },
+  "cancel": {
+    "message": "Cancel"
+  },
+  "logHeading": {
+    "message": "Activity log"
+  },
+  "clearLog": {
+    "message": "Clear"
+  },
+  "logEmpty": {
+    "message": "Nothing has happened yet."
+  },
+  "goodToKnowHeading": {
+    "message": "Good to know"
+  },
+  "tipDetection": {
+    "message": "Password fields are detected even when hidden or inside (open) Shadow DOM — you never need to click them."
+  },
+  "tipReload": {
+    "message": "When a tab becomes protected and was loaded while extensions were still on, it is reloaded so scripts those extensions had injected are gone."
+  },
+  "tipMultipleHtml": {
+    "message": "With several protected sites open at once, only extensions allowed on <em>all</em> open sites stay on."
+  },
+  "tipManualEnable": {
+    "message": "If an extension is turned on during protected mode, it is turned off again right away and you get a notification. Add it to \"Always on\" or use \"Pause\"."
+  },
+  "tipManagers": {
+    "message": "Extensions that can manage other extensions (like 1Password) may be \"Always on\"; if they turn another extension on during protected mode, Exterminator turns it off again immediately."
+  },
+  "tipUninstall": {
+    "message": "Don't remove or disable Exterminator while protected mode is active: extensions it turned off would stay off."
+  },
+  "tipSiteAccess": {
+    "message": "Extra layer: restrict the site access of extensions you rarely need on all sites to \"On click\" in chrome://extensions."
+  }
+}

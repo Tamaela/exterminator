@@ -1,198 +1,133 @@
-import {
-  getSettings,
-  updateSettings,
-  getState,
-  getPasswordTabs,
-  hostOf,
-  matchSite,
-  hostInDomains,
-  normalizeDomain,
-  suggestDomain,
-  riskOf,
-  RISK_LABELS,
-} from './common.js';
+import { t, localizePage } from './lib/i18n.js';
+import { suggestDomain } from './lib/domains.js';
+import { describeTab } from './lib/planner.js';
+import { riskOf } from './lib/risk.js';
+import { KEYS, getSettings, getState, isPaused, setPaused, getAlerts, getFlaggedTabs, actions } from './lib/storage.js';
+import { el, readDomain, onStorageChange } from './lib/ui.js';
+
+localizePage();
 
 const warnEl = document.getElementById('warnings');
 const siteEl = document.getElementById('site');
 const statusEl = document.getElementById('status');
 const pauseBtn = document.getElementById('pause');
 
-function el(tag, props = {}, ...children) {
-  const node = document.createElement(tag);
-  Object.assign(node, props);
-  node.append(...children);
-  return node;
-}
-
 const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-const host = hostOf(tab?.url);
 const incognitoAllowed = await chrome.extension.isAllowedIncognitoAccess();
 
 function renderWarnings(alerts) {
-  warnEl.replaceChildren();
-  if (!incognitoAllowed) {
-    warnEl.append(el('p', {
-      className: 'banner',
-      textContent: '⚠ Exterminator does not run in Incognito. Turn on "Allow in Incognito" for Exterminator in chrome://extensions.',
-    }));
-  }
-  if (alerts.length) {
-    warnEl.append(el('p', {
-      className: 'banner',
-      textContent: `⚠ ${alerts.length} extension(s) removed from "Always on" after a permission change. Check the settings.`,
-    }));
-  }
+  warnEl.replaceChildren(
+    !incognitoAllowed && el('p', { className: 'banner', textContent: t('popupIncognito') }),
+    alerts.length > 0 && el('p', { className: 'banner', textContent: t('popupAlerts', { count: alerts.length }) }),
+  );
   warnEl.hidden = !warnEl.childElementCount;
 }
 
-function renderSite(settings, passwordTabs) {
+function renderSite(settings, flaggedTabs) {
+  const { host, site, exclusion, detected } = describeTab(tab?.url, tab?.id, settings, flaggedTabs);
   siteEl.replaceChildren();
   if (!host) {
-    siteEl.append(el('p', { className: 'muted', textContent: 'This page cannot be protected.' }));
+    siteEl.append(el('p', { className: 'muted', textContent: t('cannotProtect') }));
     return;
   }
   siteEl.append(el('p', { className: 'host', textContent: host }));
 
-  const site = matchSite(host, settings.sites);
-  if (!site && settings.passwordDetection) {
-    const exclusion = settings.detectionExclusions.find((d) => hostInDomains(host, [d]));
-    if (exclusion) {
-      siteEl.append(
-        el('p', { className: 'muted', textContent: `Automatic protection is off for ${exclusion}.` }),
-        el('button', {
-          className: 'secondary small',
-          textContent: 'Turn back on',
-          onclick: () => updateSettings((s) => {
-            s.detectionExclusions = s.detectionExclusions.filter((d) => d !== exclusion);
-          }),
-        }),
-      );
-    } else if (passwordTabs[tab.id] === host) {
-      siteEl.append(
-        el('p', { className: 'ok', textContent: '🔑 Temporarily protected: sensitive field found' }),
-        el('button', {
-          className: 'secondary small',
-          textContent: 'Never auto-protect this site',
-          onclick: () => updateSettings((s) => {
-            const domain = suggestDomain(host);
-            if (!s.detectionExclusions.includes(domain)) s.detectionExclusions.push(domain);
-          }),
-        }),
-      );
-    }
-  }
   if (site) {
     siteEl.append(
-      el('p', {
-        className: 'ok',
-        textContent: site.domain === host ? '✓ Protected site' : `✓ Protected via ${site.domain}`,
-      }),
+      el('p', { className: 'ok', textContent: site.domain === host ? t('protectedSite') : t('protectedVia', { domain: site.domain }) }),
       el('label', { className: 'toggle small-text' },
-        el('input', {
-          type: 'checkbox',
-          checked: !!site.cleanup,
-          onchange: (e) => updateSettings((s) => {
-            const target = s.sites.find((x) => x.domain === site.domain);
-            if (target) target.cleanup = e.target.checked;
-          }),
-        }),
-        el('span', { textContent: 'Log out when leaving (clear cookies and site data)' }),
-      ),
-      el('button', {
-        className: 'danger',
-        textContent: 'Remove protection',
-        onclick: () => updateSettings((s) => {
-          s.sites = s.sites.filter((x) => x.domain !== site.domain);
-        }),
-      }),
+        el('input', { type: 'checkbox', checked: site.cleanup, onchange: (e) => actions.setSiteCleanup(site.domain, e.target.checked) }),
+        el('span', { textContent: t('logOutWhenLeaving') })),
+      el('button', { className: 'danger', textContent: t('removeProtection'), onclick: () => actions.removeSite(site.domain) }),
     );
     return;
   }
 
+  if (settings.fieldDetection && exclusion) {
+    siteEl.append(
+      el('p', { className: 'muted', textContent: t('autoOffFor', { domain: exclusion }) }),
+      el('button', { className: 'secondary small', textContent: t('turnBackOn'), onclick: () => actions.removeExclusion(exclusion) }),
+    );
+  } else if (detected) {
+    siteEl.append(
+      el('p', { className: 'ok', textContent: t('detectedProtected') }),
+      el('button', { className: 'secondary small', textContent: t('neverAutoProtect'), onclick: () => actions.addExclusion(suggestDomain(host)) }),
+    );
+  }
+
   const input = el('input', { type: 'text', value: suggestDomain(host), spellcheck: false });
   const error = el('p', { className: 'error', hidden: true });
-  const add = async () => {
-    const domain = normalizeDomain(input.value);
-    if (!domain) {
-      error.textContent = 'Invalid domain, for example: mybank.com';
-      error.hidden = false;
-      return;
-    }
-    await updateSettings((s) => {
-      if (!s.sites.some((x) => x.domain === domain)) s.sites.push({ domain, extra: [], cleanup: false });
-    });
+  const add = () => {
+    const domain = readDomain(input, error);
+    if (domain) actions.addSite(domain);
   };
   input.addEventListener('keydown', (e) => e.key === 'Enter' && add());
   siteEl.append(
-    el('label', { className: 'field' }, el('span', { textContent: 'Domain (includes subdomains)' }), input),
+    el('label', { className: 'field' }, el('span', { textContent: t('domainLabel') }), input),
     error,
-    el('button', { textContent: '🛡 Protect this site', onclick: add }),
+    el('button', { textContent: t('protectThisSite'), onclick: add }),
   );
 }
 
+// "Always on" button; high-risk extensions need a second click.
 function allowButton(ext) {
-  if (!ext) return '';
+  if (!ext) return null;
   const risk = riskOf(ext);
-  const btn = el('button', { className: 'secondary small', textContent: 'Always on' });
-  let armed = false;
-  btn.addEventListener('click', async () => {
-    if (risk.level === 'high' && !armed) {
-      armed = true;
-      btn.textContent = 'Sure? High risk';
+  const btn = el('button', { className: 'secondary small', textContent: t('alwaysOn') });
+  btn.addEventListener('click', () => {
+    if (risk.level === 'high' && !btn.dataset.armed) {
+      btn.dataset.armed = '1';
+      btn.textContent = t('sureHighRisk');
       btn.className = 'danger small';
       return;
     }
-    await updateSettings((s) => {
-      if (!s.globalWhitelist.includes(ext.id)) s.globalWhitelist.push(ext.id);
-    });
+    actions.setAlwaysOn(ext.id, true);
   });
   return btn;
 }
 
-function renderStatus(settings, state, byId) {
+function renderStatus(paused, state, byId) {
   statusEl.replaceChildren();
-  if (settings.paused) {
-    statusEl.append(el('p', { className: 'warn', textContent: '⏸ Paused until you leave all protected pages.' }));
+  if (paused) {
+    statusEl.append(el('p', { className: 'warn', textContent: t('pausedStatus') }));
   } else if (state.activeSites.length) {
-    statusEl.append(el('p', { className: 'ok', textContent: `Protected mode active (${state.activeSites.join(', ')})` }));
     const ids = state.disabledByUs;
-    statusEl.append(el('p', { textContent: `${ids.length} extension(s) temporarily turned off${ids.length ? ':' : '.'}` }));
+    statusEl.append(
+      el('p', { className: 'ok', textContent: t('activeStatus', { sites: state.activeSites.join(', ') }) }),
+      el('p', { textContent: ids.length ? t('disabledCount', { count: ids.length }) : t('disabledNone') }),
+    );
     if (ids.length) {
       statusEl.append(el('ul', { className: 'disabled-list' }, ...ids.map((id) => {
         const ext = byId.get(id);
         const risk = ext ? riskOf(ext) : null;
         return el('li', {},
           el('span', { className: 'name' },
-            risk ? el('span', { className: `dot risk-${risk.level}`, title: `${RISK_LABELS[risk.level]}\n${risk.reasons.join('\n')}` }) : '',
+            risk && el('span', { className: `dot risk-${risk.level}`, title: [risk.label, ...risk.reasons].join('\n') }),
             ext?.name || id),
           allowButton(ext));
       })));
     }
   } else {
-    statusEl.append(el('p', { className: 'muted', textContent: 'Protected mode not active.' }));
+    statusEl.append(el('p', { className: 'muted', textContent: t('notActive') }));
   }
-
-  pauseBtn.hidden = !(settings.paused || state.activeSites.length);
-  pauseBtn.textContent = settings.paused ? 'Resume protection' : 'Pause';
+  pauseBtn.hidden = !(paused || state.activeSites.length);
+  pauseBtn.textContent = paused ? t('resume') : t('pause');
 }
 
 async function render() {
-  const [settings, state, exts, passwordTabs, { alerts = [] }] = await Promise.all([
-    getSettings(), getState(), chrome.management.getAll(), getPasswordTabs(), chrome.storage.local.get('alerts'),
+  const [settings, state, paused, exts, flaggedTabs, alerts] = await Promise.all([
+    getSettings(), getState(), isPaused(), chrome.management.getAll(), getFlaggedTabs(), getAlerts(),
   ]);
-  const byId = new Map(exts.map((e) => [e.id, e]));
   renderWarnings(alerts);
-  renderSite(settings, settings.passwordDetection ? passwordTabs : {});
-  renderStatus(settings, state, byId);
+  renderSite(settings, flaggedTabs);
+  renderStatus(paused, state, new Map(exts.map((e) => [e.id, e])));
 }
 
-pauseBtn.addEventListener('click', () => updateSettings((s) => { s.paused = !s.paused; }));
+pauseBtn.addEventListener('click', async () => setPaused(!(await isPaused())));
 document.getElementById('open-options').addEventListener('click', (e) => {
   e.preventDefault();
   chrome.runtime.openOptionsPage();
 });
-chrome.storage.onChanged.addListener((changes) => {
-  if (changes.settings || changes.state || changes.passwordTabs || changes.alerts) render();
-});
+onStorageChange([KEYS.settings, KEYS.state, KEYS.paused, KEYS.flaggedTabs, KEYS.alerts], render);
 
 render();

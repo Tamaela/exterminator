@@ -1,4 +1,6 @@
-// Hidden document that only clears the clipboard (MV3 service workers can't do this themselves).
+// Hidden document that only clears the clipboard. MV3 service workers can't touch the
+// clipboard and offscreen documents never have focus (so navigator.clipboard fails);
+// execCommand('copy') with a copy handler is the approach Chrome documents for this.
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   if (msg?.target !== 'offscreen' || msg.type !== 'clear-clipboard') return;
   const onCopy = (e) => {
