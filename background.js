@@ -1,14 +1,14 @@
 import { t } from './lib/i18n.js';
-import { hostOf, matchSite, suggestDomain } from './lib/domains.js';
-import { plan, siteForTab, describeTab, allowlistedIds, wholeSites } from './lib/planner.js';
+import { hostOf, matchSite } from './lib/domains.js';
+import { plan, siteForTab, allowlistedIds, wholeSites } from './lib/planner.js';
 import { describePermission, permissionSnapshot } from './lib/risk.js';
 import { DETECTOR_ORIGINS, detectorFiles } from './lib/detection.js';
+import { createTabTracker, ASK_NOTIFICATION } from './lib/tabs.js';
 import {
   KEYS, migrate, getSettings, isPaused, setPaused, getState, setState,
   getAlerts, setAlerts, getApprovals, setApprovals, addLog, actions,
-  getFlaggedTabs, setFlaggedTabs, getFramedTabs, setFramedTabs, getPrerenderTabs, setPrerenderTabs,
-  getLoadTimes, setLoadTimes, isBooted, markBooted, getInheritedTabs, setInheritedTabs,
-  getLoadHistory, setLoadHistory, isUpdatePending, markUpdatePending, getAsks, setAsks, openAsks,
+  getTabData, setTabData, getFlaggedTabs, getFramedTabs,
+  isBooted, markBooted, isUpdatePending, markUpdatePending, getAsks, setAsks, openAsks,
 } from './lib/storage.js';
 
 // Grace period before extensions come back or a site is cleaned up, so that
@@ -21,8 +21,7 @@ const AUDIT_MINUTES = 30;
 // (permissions granted at runtime fire no event).
 const FAST_AUDIT_ALARM = 'exterminator-audit-active';
 const DETECTOR_ID = 'field-detector';
-const NOTIFY = { intrusion: 'intrusion', frame: 'frame-', stale: 'stale-', disableFailed: 'disable-failed', clipboard: 'clipboard-failed', ask: 'ask-' };
-const HISTORY_MAX = 20;
+const NOTIFY = { intrusion: 'intrusion', frame: 'frame-', stale: 'stale-', disableFailed: 'disable-failed', clipboard: 'clipboard-failed', ask: ASK_NOTIFICATION };
 
 // --- Task queue ---------------------------------------------------------------------------
 
@@ -142,7 +141,7 @@ async function syncDetector(settings, { injectOpen = false } = {}) {
   } else if (!want && current) {
     await chrome.scripting.unregisterContentScripts({ ids: [DETECTOR_ID] });
   }
-  if (!want) await setFlaggedTabs({});
+  if (!want) await setTabData('flagged', {});
   // Not awaited: injecting can be slow or never finish for some tabs, and must not hold up
   // the task queue (turning extensions off).
   if (want && (injectOpen || !current)) injectDetector(js).catch(() => {});
@@ -156,155 +155,16 @@ async function injectDetector(js) {
     .catch(() => {}))); // e.g. an error page, the Web Store, or a tab that doesn't respond
 }
 
-// Tabs whose flag was dropped because they showed another page, with the host they had.
-// When the new page reports a field on that same host, the activity log gets no new entry.
-// Kept in memory only: after a service worker restart, the worst case is one extra log entry.
-const recheckedTabs = new Map();
-// The address (without #fragment) each flagged tab had when it was flagged, also in memory only.
-const flaggedPages = new Map();
-const withoutHash = (url) => String(url || '').split('#')[0];
-
-// A tab with a sensitive field stays protected for as long as it shows that page.
-// `reused`: the document came back from the back/forward cache or a prerender, so it may
-// hold scripts of extensions that were on at the time; forget its load time to force a reload.
-async function flagTab(tab, reused) {
-  const settings = await getSettings();
-  const flagged = await getFlaggedTabs();
-  const { host, site, exclusion } = describeTab(tab?.url, tab?.id, settings, flagged);
-  if (!settings.fieldDetection || !host || exclusion) return false;
-  if (reused) {
-    const times = await getLoadTimes();
-    times[tab.id] = 0;
-    await setLoadTimes(times);
-  } else if (flagged[tab.id] === host) {
-    return false;
-  }
-  flagged[tab.id] = host;
-  await setFlaggedTabs(flagged);
-  flaggedPages.set(tab.id, withoutHash(tab.url));
-  const again = recheckedTabs.get(tab.id) === host;
-  recheckedTabs.delete(tab.id);
-  if (site && site.level !== 'login') return true; // protected as a whole: nothing to log or ask
-  if (!again) await addLog({ type: 'detected', site: host });
-  if (!site) await askLevel(suggestDomain(host), settings);
-  return true;
-}
-
-// The first detection on a site you haven't classified: ask once how to protect it.
-// The question itself is shown only in Exterminator's own popup and settings page, never in
-// the web page, so the page can't fake it or trick you into lowering protection.
-async function askLevel(domain, settings) {
-  const asks = await getAsks();
-  if (domain in asks || !openAsks({ [domain]: 0 }, settings).length) return;
-  asks[domain] = Date.now();
-  await setAsks(asks);
-  await notify(`${NOTIFY.ask}${domain}`, { title: t('askNotifyTitle', { domain }), message: t('askNotifyMessage') });
-}
-
-// The tab shows another page: drop its flag. The detector of the new page flags it again if
-// that page also has a sensitive field. The grace period keeps extensions off in the meantime.
-async function unflagTab(tabId, flagged) {
-  recheckedTabs.set(tabId, flagged[tabId]);
-  flaggedPages.delete(tabId);
-  delete flagged[tabId];
-  await setFlaggedTabs(flagged);
-}
-
-// A page that changed its address without loading a new document (a single-page app).
-// Its detector already reported once, so ask it to scan again.
-async function recheckTab(tabId) {
-  const flagged = await getFlaggedTabs();
-  if (!(tabId in flagged)) return false;
-  await unflagTab(tabId, flagged);
-  const settings = await getSettings();
-  const js = detectorFiles(settings);
-  // Not awaited, like injectDetector: a tab that doesn't respond must not hold up the queue.
-  withTimeout(chrome.scripting.executeScript({ target: { tabId, allFrames: true }, files: js }), 5000, 'recheck')
-    .catch(() => {});
-  return true;
-}
-
-// A new top-level document (newUrl) or a closed tab (no newUrl).
-async function forgetTab(tabId, newUrl) {
-  const flagged = await getFlaggedTabs();
-  if (tabId in flagged) {
-    if (newUrl === undefined) {
-      delete flagged[tabId];
-      recheckedTabs.delete(tabId);
-      flaggedPages.delete(tabId);
-      await setFlaggedTabs(flagged);
-    } else {
-      await unflagTab(tabId, flagged);
-    }
-  }
-  for (const [get, set] of [[getFramedTabs, setFramedTabs], [getPrerenderTabs, setPrerenderTabs]]) {
-    const map = await get();
-    if (tabId in map) {
-      delete map[tabId]; // frames and prerenders belonged to the previous document
-      await set(map);
-    }
-  }
-  const inherited = await getInheritedTabs();
-  // A popup keeps its opener's site until it shows a real web page of its own.
-  if (tabId in inherited && (newUrl === undefined || /^https?:/i.test(newUrl))) {
-    delete inherited[tabId];
-    await setInheritedTabs(inherited);
-  }
-  if (newUrl === undefined) {
-    for (const [get, set] of [[getLoadTimes, setLoadTimes], [getLoadHistory, setLoadHistory]]) {
-      const map = await get();
-      delete map[tabId];
-      await set(map);
-    }
-  }
-}
-
-// The commit time Chrome reports, not the moment this queued task runs: an earlier queued
-// task may have turned extensions off in between, after the page already got their scripts.
-// Back/forward (`restored`): the document may come from the back/forward cache, loaded long
-// ago; use the time this URL was first loaded in this tab, or 0 (unknown) if we never saw it.
-async function recordLoad(tabId, committedAt, url, restored) {
-  const history = await getLoadHistory();
-  const entries = history[tabId] || [];
-  const at = Math.min(committedAt ?? Infinity, Date.now());
-  const earlier = restored ? entries.findLast((e) => e.url === url) : null;
-  const loadedAt = restored ? earlier?.at ?? 0 : at;
-  history[tabId] = [...entries.filter((e) => e.url !== url), { url, at: loadedAt }].slice(-HISTORY_MAX);
-  await setLoadHistory(history);
-  const times = await getLoadTimes();
-  times[tabId] = loadedAt;
-  await setLoadTimes(times);
-}
-
-// A popup or new tab opened by a protected page (window.open, target=_blank). An about:blank
-// popup has no origin of its own: it stays protected as part of the opener's site, even if the
-// opener later navigates away.
-async function recordOpener(d) {
-  const [settings, flagged, inherited] = await Promise.all([getSettings(), getFlaggedTabs(), getInheritedTabs()]);
-  let source;
-  try {
-    source = await chrome.tabs.get(d.sourceTabId);
-  } catch {
-    return;
-  }
-  const site = siteForTab(source.url, source.id, settings, flagged);
-  const entry = site
-    ? { host: site.auto ? site.domain : hostOf(source.url), auto: !!site.auto }
-    : inherited[d.sourceTabId]; // a popup opened by such a popup
-  if (!entry) return;
-  inherited[d.tabId] = entry;
-  await setInheritedTabs(inherited);
-}
-
-async function addHost(get, set, tabId, host) {
-  const map = await get();
-  const hosts = new Set(map[tabId] || []);
-  if (hosts.has(host)) return;
-  map[tabId] = [...hosts, host];
-  await set(map);
-}
-const recordFrame = (tabId, host) => addHost(getFramedTabs, setFramedTabs, tabId, host);
-const recordPrerender = (tabId, host) => addHost(getPrerenderTabs, setPrerenderTabs, tabId, host);
+const tracker = createTabTracker({
+  notify,
+  // Not awaited by the tracker: a tab that doesn't respond must not hold up the task queue.
+  inject: (tabId, files) => {
+    withTimeout(chrome.scripting.executeScript({ target: { tabId, allFrames: true }, files }), 5000, 'recheck')
+      .catch(() => {});
+  },
+  getTab: (tabId) => chrome.tabs.get(tabId).catch(() => null),
+});
+const { flagTab, recheckTab, isFlaggedPage, forgetTab, recordLoad, recordOpener, recordFrame, recordPrerender, replaceTab } = tracker;
 
 // Protected hosts in the sub-frames a tab has right now. Needed when frames exist without a
 // new commit: a page restored from the back/forward cache, or after Exterminator restarted.
@@ -330,27 +190,6 @@ async function protectedFrameHosts(tabId) {
     if (host && matchSite(host, sites)) found.add(host);
   }
   return [...found];
-}
-
-// A tab was swapped for another one (e.g. a discarded tab coming back): keep what we know.
-async function replaceTab(added, removed) {
-  const pairs = [[getFlaggedTabs, setFlaggedTabs], [getFramedTabs, setFramedTabs], [getPrerenderTabs, setPrerenderTabs],
-    [getInheritedTabs, setInheritedTabs]];
-  for (const [get, set] of pairs) {
-    const map = await get();
-    if (!(removed in map)) continue;
-    const [mine, theirs] = [map[added], map[removed]];
-    // Merge, never drop: the new tab may already have recorded something itself.
-    map[added] = Array.isArray(theirs) ? [...new Set([...(mine || []), ...theirs])] : mine ?? theirs;
-    delete map[removed];
-    await set(map);
-  }
-  for (const [get, set] of [[getLoadTimes, setLoadTimes], [getLoadHistory, setLoadHistory]]) {
-    const map = await get();
-    if (!(removed in map)) continue;
-    delete map[removed]; // the new tab's load time is unknown: that forces a reload when needed
-    await set(map);
-  }
 }
 
 // --- Monitoring "Always on" extensions --------------------------------------------------------
@@ -523,8 +362,8 @@ async function evaluate(opts = {}) {
     await logError('errInternal', {}, err); // never skip turning extensions off because of this
   }
   const [settings, state, paused, flaggedTabs, framedTabs, prerenderTabs, inheritedTabs, loadTimes, tabs, extensions] = await Promise.all([
-    getSettings(), getState(), isPaused(), getFlaggedTabs(), getFramedTabs(), getPrerenderTabs(), getInheritedTabs(),
-    getLoadTimes(), chrome.tabs.query({}), chrome.management.getAll(),
+    getSettings(), getState(), isPaused(), getFlaggedTabs(), getFramedTabs(), getTabData('prerender'), getTabData('inherited'),
+    getTabData('loadTimes'), chrome.tabs.query({}), chrome.management.getAll(),
   ]);
   const p = plan({
     now: Date.now(), graceMs: GRACE_MS, settings, state, paused, tabs, flaggedTabs, framedTabs, prerenderTabs,
@@ -720,7 +559,7 @@ chrome.webNavigation.onCommitted.addListener((d) => {
 // replaceState to the same address, is not another page.
 chrome.webNavigation.onHistoryStateUpdated.addListener((d) => {
   if (!isMainFrame(d) || isPrerender(d)) return;
-  if (flaggedPages.get(d.tabId) === withoutHash(d.url)) return;
+  if (isFlaggedPage(d.tabId, d.url)) return;
   run(async () => {
     if (await recheckTab(d.tabId)) await protect();
   });

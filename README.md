@@ -49,7 +49,9 @@ Turning an extension off does not remove the scripts it already injected into a 
 | `offscreen.*` | This hidden document clears the clipboard. |
 | `lib/planner.js` | The planner holds all decision logic. Unit tests cover it. |
 | `lib/storage.js` | This module defines storage keys, schema migrations, settings actions and the activity log. |
-| `lib/domains.js`, `lib/risk.js`, `lib/i18n.js`, `lib/ui.js` | These modules contain helper functions. |
+| `lib/tabs.js` | This module keeps per-tab data: detected fields, protected frames, popups and load times. Unit tests cover it. |
+| `lib/levels.js` | This module draws the protection level choices in the popup and the settings page. |
+| `lib/domains.js`, `lib/risk.js`, `lib/i18n.js`, `lib/ui.js`, `lib/detection.js` | These modules contain helper functions. |
 | `_locales/en/messages.json` | This file contains all text that users see. |
 
 ## Permissions
