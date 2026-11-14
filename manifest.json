@@ -1,0 +1,44 @@
+{
+  "manifest_version": 3,
+  "name": "Exterminator",
+  "version": "0.3.0",
+  "description": "Automatically disables other extensions on sensitive websites (like your bank) and turns them back on when you leave.",
+  "permissions": [
+    "management",
+    "tabs",
+    "storage",
+    "webNavigation",
+    "alarms",
+    "scripting",
+    "browsingData",
+    "offscreen",
+    "notifications"
+  ],
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "action": {
+    "default_title": "Exterminator",
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png",
+      "48": "icons/icon48.png"
+    }
+  },
+  "options_ui": {
+    "page": "options.html",
+    "open_in_tab": true
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "optional_host_permissions": [
+    "http://*/*",
+    "https://*/*"
+  ]
+}

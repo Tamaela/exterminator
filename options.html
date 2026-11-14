@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Exterminator – Settings</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body class="options">
+  <main>
+    <header>
+      <img src="icons/icon48.png" alt="">
+      <h1>Exterminator</h1>
+    </header>
+
+    <div id="warnings"></div>
+
+    <section class="card alert-card" id="alerts-card" hidden>
+      <h2>⚠ Removed from "Always on"</h2>
+      <p class="muted">These extensions gained new permissions after an update.
+        They will be turned off on protected pages again until you re-approve them.</p>
+      <ul id="alerts" class="alert-list"></ul>
+    </section>
+
+    <section class="card">
+      <h2>Protected sites</h2>
+      <p class="muted">On these sites (and their subdomains) all extensions are turned off, except the allowed ones.
+        Protected mode stays active as long as a tab of a protected site is open anywhere.</p>
+      <form id="add-site" class="row">
+        <input type="text" id="new-domain" placeholder="e.g. mybank.com" spellcheck="false">
+        <button type="submit">Add</button>
+      </form>
+      <p id="add-error" class="error" hidden></p>
+      <div id="sites"></div>
+    </section>
+
+    <section class="card">
+      <h2>Automatic protection</h2>
+      <label class="toggle">
+        <input type="checkbox" id="password-detection">
+        <span><strong>Protect every page with a password field</strong><br>
+          <span class="muted">Extensions are also turned off on sites that aren't in your list (only "Always on" stays on).
+            The tab stays protected until you leave that website. Chrome will ask for access to all websites for this;
+            Exterminator only checks <em>whether</em> such a field exists and reads nothing else.</span></span>
+      </label>
+      <p id="detection-error" class="error" hidden></p>
+      <label class="toggle sub">
+        <input type="checkbox" id="sensitive-fields">
+        <span><strong>Other sensitive fields too</strong><br>
+          <span class="muted">Credit card number, CVC, expiry date, one-time codes (2FA), IBAN and social security / national ID numbers.</span></span>
+      </label>
+      <div class="sub-block">
+        <strong>Exceptions</strong><br>
+        <span class="muted">Sensitive fields on these sites (and their subdomains) never trigger protection,
+          for example sites with a hidden login form on every page. Sites in your protected list are always protected.</span>
+        <form id="add-exclusion" class="row">
+          <input type="text" id="new-exclusion" placeholder="e.g. example.com" spellcheck="false">
+          <button type="submit" class="secondary">Add</button>
+        </form>
+        <p id="exclusion-error" class="error" hidden></p>
+        <ul id="exclusions" class="plain-list"></ul>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>After leaving</h2>
+      <label class="toggle">
+        <input type="checkbox" id="clear-clipboard">
+        <span><strong>Clear clipboard</strong><br>
+          <span class="muted">The clipboard is emptied before extensions come back, so a copied password or account number
+            can't be read. Note: this also happens if you meant to paste something on another site.</span></span>
+      </label>
+      <p class="muted">For each site above you can also turn on <strong>Log out when leaving</strong>: the site's cookies and
+        site data are then cleared, so extensions can't take over your session.</p>
+    </section>
+
+    <section class="card">
+      <h2>Always on</h2>
+      <p class="muted">These extensions stay on on <strong>all</strong> protected pages (including pages with sensitive fields),
+        for example your password manager. Everything else, including newly installed extensions, is turned off.
+        If an extension here gains new permissions after an update, it is removed from this list automatically.</p>
+      <div class="row spread list-tools">
+        <label class="sort">Sort by
+          <select id="sort">
+            <option value="risk">Risk (highest first)</option>
+            <option value="risk-asc">Risk (lowest first)</option>
+            <option value="name">Name</option>
+          </select>
+        </label>
+      </div>
+      <p class="legend"><span class="risk risk-high">high risk</span> <span class="risk risk-medium">medium risk</span>
+        <span class="risk risk-low">low risk</span> <span class="muted">based on the extension's permissions</span></p>
+      <ul id="global" class="ext-list"></ul>
+    </section>
+
+    <section class="card">
+      <div class="row spread">
+        <h2>Activity log</h2>
+        <button id="clear-log" class="secondary small">Clear</button>
+      </div>
+      <ul id="log" class="log"></ul>
+    </section>
+
+    <section class="card">
+      <h2>Good to know</h2>
+      <ul>
+        <li>Password fields are detected even when hidden or inside (open) Shadow DOM — you never need to click them.</li>
+        <li>After turning extensions off, the page is reloaded so scripts that extensions had already loaded are gone.</li>
+        <li>With several protected sites open at once, only extensions allowed on <em>all</em> open sites stay on.</li>
+        <li>If you turn an extension on yourself during protected mode, it is turned off again right away. Add it to "Always on" or use "Pause".</li>
+        <li>Extensions that can manage other extensions (like 1Password) may be "Always on", but if they turn another extension on during protected mode, Exterminator turns it off again immediately.</li>
+        <li>Don't remove or disable Exterminator while protected mode is active: extensions it turned off would stay off.</li>
+        <li>Extra layer: set your password manager's site access to "On click" in chrome://extensions.</li>
+      </ul>
+    </section>
+  </main>
+  <script type="module" src="options.js"></script>
+</body>
+</html>
