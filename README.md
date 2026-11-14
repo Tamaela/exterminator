@@ -23,6 +23,7 @@ An extension can read everything on the pages it runs on. That includes password
 - An extension that is turned on during protected mode is turned off again. You get a notification with a button that reloads the protected tabs.
 - A separate setting clears the clipboard when you leave any protected site. It is off by default.
 - The popup shows the protected sites that are open. Clicking a site switches to its tab.
+- The settings page can export your settings to a file and import them in another Chrome profile. An import never turns on an extension that this profile has not approved.
 - The settings page keeps an activity log. The popup warns you when Exterminator has no incognito access.
 - The pause button applies to the protected sites that are open when you press it. The pause ends when you leave those sites or open another protected site. It lasts at most one hour.
 

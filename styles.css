@@ -199,3 +199,13 @@ button.site-link:hover { filter: none; text-decoration-thickness: 2px; }
 .welcome-list { padding-left: 20px; }
 .welcome-list li { margin: 6px 0; }
 #consent button { margin-right: 8px; }
+
+/* A file input that looks like a secondary button */
+.file-button {
+  display: inline-block;
+  padding: 6px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  cursor: pointer;
+}
+.file-button:hover { filter: brightness(1.08); }

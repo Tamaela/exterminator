@@ -592,5 +592,26 @@
   },
   "popupSetupButton": {
     "message": "Open welcome page"
+  },
+  "backupHeading": {
+    "message": "Backup"
+  },
+  "backupIntro": {
+    "message": "Save your settings as a file, or load them in another Chrome profile. Importing replaces the current settings."
+  },
+  "exportSettings": {
+    "message": "Export settings"
+  },
+  "importSettings": {
+    "message": "Import settings"
+  },
+  "importDone": {
+    "message": "Settings imported."
+  },
+  "importSkipped": {
+    "message": "Settings imported. These extensions were allowed in the file but never approved in this profile, so they stay off: {names}. Turn them on in the lists if you trust them."
+  },
+  "importFailed": {
+    "message": "This file is not an Exterminator export."
   }
 }

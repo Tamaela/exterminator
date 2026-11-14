@@ -1,7 +1,7 @@
 import { t, localizePage } from './lib/i18n.js';
 import { riskOf, describePermission, canManageExtensions, sortByRisk, permissionSnapshot } from './lib/risk.js';
 import {
-  KEYS, getSettings, getAlerts, getLog, clearLog, logText, actions, getAsks,
+  KEYS, getSettings, getAlerts, getLog, clearLog, logText, actions, getAsks, exportSettings, importSettings,
 } from './lib/storage.js';
 import { el, readDomain, onStorageChange } from './lib/ui.js';
 import { levelPicker, askCards, levelsFor } from './lib/levels.js';
@@ -206,6 +206,35 @@ $('field-detection').addEventListener('change', async (e) => {
 $('sensitive-fields').addEventListener('change', (e) => actions.setOption('sensitiveFields', e.target.checked));
 $('clear-clipboard').addEventListener('change', (e) => actions.setOption('clearClipboard', e.target.checked));
 $('clear-log').addEventListener('click', clearLog);
+
+// Export: the settings as a JSON file in your downloads.
+$('export').addEventListener('click', async () => {
+  const blob = new Blob([JSON.stringify(await exportSettings(), null, 2)], { type: 'application/json' });
+  const link = el('a', { href: URL.createObjectURL(blob), download: 'exterminator-settings.json' });
+  link.click();
+  URL.revokeObjectURL(link.href);
+});
+
+// Import: replaces the settings. Extensions you never approved in this profile stay off the
+// lists; the result names them so you can review and add them yourself.
+$('import').addEventListener('change', async (e) => {
+  const file = e.target.files[0];
+  e.target.value = '';
+  if (!file) return;
+  const result = $('import-result');
+  result.hidden = false;
+  result.className = 'muted';
+  try {
+    const skipped = await importSettings(JSON.parse(await file.text()), await chrome.permissions.contains({ origins: DETECTOR_ORIGINS }));
+    const names = new Map((await chrome.management.getAll()).map((x) => [x.id, x.name]));
+    result.textContent = skipped.length
+      ? t('importSkipped', { names: skipped.map((id) => names.get(id) || id).join(', ') })
+      : t('importDone');
+  } catch {
+    result.className = 'error';
+    result.textContent = t('importFailed');
+  }
+});
 $('sort').addEventListener('change', (e) => {
   sortMode = e.target.value;
   try {

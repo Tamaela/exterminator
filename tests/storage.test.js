@@ -1,7 +1,7 @@
 import './chrome-stub.js';
 import { test, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { migrate, getSettings, isPaused, pauseFor, getState, actions, addLog, getLog, logText, normalizeSettings, LOG_MAX, SCHEMA_VERSION, getAsks, setAsks, openAsks, hasConsent, giveConsent } from '../lib/storage.js';
+import { migrate, getSettings, isPaused, pauseFor, getState, actions, addLog, getLog, logText, normalizeSettings, LOG_MAX, SCHEMA_VERSION, getAsks, setAsks, openAsks, hasConsent, giveConsent, exportSettings, importSettings, prepareImport } from '../lib/storage.js';
 import { PAUSE_MAX_MS } from '../lib/planner.js';
 
 beforeEach(() => {
@@ -153,4 +153,45 @@ test('migrates v2 data to the current schema', async () => {
   assert.equal((await getSettings()).fieldDetection, true);
   const { state } = await chrome.storage.local.get('state');
   assert.deepEqual(state, { disabledByUs: ['x'] });
+});
+
+const A = 'a'.repeat(32);
+const B = 'b'.repeat(32);
+
+test('export and import round-trip the settings', async () => {
+  chrome.storage.local.reset({ approvals: { [A]: { permissions: [] } } });
+  await actions.addSite('bank.com');
+  await actions.setAlwaysOn(A, true);
+  await actions.addExclusion('shop.com');
+  const file = JSON.parse(JSON.stringify(await exportSettings()));
+  chrome.storage.local.reset({ approvals: { [A]: { permissions: [] } } });
+  assert.deepEqual(await importSettings(file, true), []);
+  const s = await getSettings();
+  assert.deepEqual(s.sites, [{ domain: 'bank.com', extra: [], level: 'strict' }]);
+  assert.deepEqual(s.globalWhitelist, [A]);
+  assert.deepEqual(s.detectionExclusions, ['shop.com']);
+});
+
+test('an import never trusts extensions this profile did not approve', () => {
+  const data = { app: 'exterminator', settings: {
+    sites: [{ domain: 'https://www.Bank.com/x', extra: [A, B, 'not-an-id'], level: 'site' }, { domain: 'bank.com' }, { domain: 'bad domain' }],
+    globalWhitelist: [B], detectionExclusions: ['ok.com', '???'], fieldDetection: 'yes',
+  } };
+  const { settings, skipped } = prepareImport(data, { [A]: {} });
+  assert.deepEqual(settings.sites, [{ domain: 'bank.com', extra: [A], level: 'site' }]);
+  assert.deepEqual(settings.globalWhitelist, []);
+  assert.deepEqual(skipped, [B]);
+  assert.deepEqual(settings.detectionExclusions, ['ok.com']);
+  assert.equal(settings.fieldDetection, false);
+});
+
+test('automatic protection stays off after an import without website access', async () => {
+  chrome.storage.local.reset();
+  await importSettings({ app: 'exterminator', settings: { fieldDetection: true } }, false);
+  assert.equal((await getSettings()).fieldDetection, false);
+});
+
+test('a file that is not an export is refused', () => {
+  assert.throws(() => prepareImport({ settings: {} }, {}), /not an Exterminator export/);
+  assert.throws(() => prepareImport(null, {}), /not an Exterminator export/);
 });

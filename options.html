@@ -99,6 +99,19 @@
     </section>
 
     <section class="card">
+      <h2 data-i18n="backupHeading"></h2>
+      <p class="muted" data-i18n="backupIntro"></p>
+      <div class="row">
+        <button id="export" class="secondary" data-i18n="exportSettings"></button>
+        <label class="file-button secondary">
+          <span data-i18n="importSettings"></span>
+          <input type="file" id="import" accept="application/json,.json" hidden>
+        </label>
+      </div>
+      <p id="import-result" class="muted" hidden></p>
+    </section>
+
+    <section class="card">
       <div class="row spread">
         <h2 data-i18n="logHeading"></h2>
         <button id="clear-log" class="secondary small" data-i18n="clearLog"></button>

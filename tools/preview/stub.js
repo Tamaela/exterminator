@@ -64,7 +64,7 @@
     extension: { isAllowedIncognitoAccess: async () => true },
     runtime: { id: 'self', getURL: (path) => path, getManifest: () => ({ version }), openOptionsPage() {} },
     management: { getAll: async () => exts, onInstalled: noEvents, onUninstalled: noEvents, onEnabled: noEvents, onDisabled: noEvents },
-    permissions: { request: async () => true, remove: async () => true },
+    permissions: { request: async () => true, remove: async () => true, contains: async () => true },
     storage: { local: area(data.local), session: area(data.session), onChanged: noEvents },
   };
 })();
