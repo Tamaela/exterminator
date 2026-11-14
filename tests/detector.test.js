@@ -156,7 +156,7 @@ test('injecting the detector again makes a live detector scan and report anew', 
 
 test('an orphaned detector does not block a new one', async () => {
   const before = (w) => {
-    w.eval(code); // detector of an Tab Chaperone instance that is gone (no runtime.id)
+    w.eval(code); // detector of a Tab Chaperone instance that is gone (no runtime.id)
     w.chrome.runtime.id = 'self';
   };
   const messages = await detect('<button></button>', { before, act: (w) => addPassword(w.document.body, w.document) });

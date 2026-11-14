@@ -196,6 +196,6 @@ test('an export made before the rename can still be imported', () => {
 });
 
 test('a file that is not an export is refused', () => {
-  assert.throws(() => prepareImport({ settings: {} }, {}), /not an Tab Chaperone export/);
-  assert.throws(() => prepareImport(null, {}), /not an Tab Chaperone export/);
+  assert.throws(() => prepareImport({ settings: {} }, {}), /not a Tab Chaperone export/);
+  assert.throws(() => prepareImport(null, {}), /not a Tab Chaperone export/);
 });
