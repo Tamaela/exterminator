@@ -173,7 +173,7 @@ test('export and import round-trip the settings', async () => {
 });
 
 test('an import never trusts extensions this profile did not approve', () => {
-  const data = { app: 'exterminator', settings: {
+  const data = { app: 'tab-chaperone', settings: {
     sites: [{ domain: 'https://www.Bank.com/x', extra: [A, B, 'not-an-id'], level: 'site' }, { domain: 'bank.com' }, { domain: 'bad domain' }],
     globalWhitelist: [B], detectionExclusions: ['ok.com', '???'], fieldDetection: 'yes',
   } };
@@ -187,11 +187,15 @@ test('an import never trusts extensions this profile did not approve', () => {
 
 test('automatic protection stays off after an import without website access', async () => {
   chrome.storage.local.reset();
-  await importSettings({ app: 'exterminator', settings: { fieldDetection: true } }, false);
+  await importSettings({ app: 'tab-chaperone', settings: { fieldDetection: true } }, false);
   assert.equal((await getSettings()).fieldDetection, false);
 });
 
+test('an export made before the rename can still be imported', () => {
+  assert.deepEqual(prepareImport({ app: 'exterminator', settings: { sites: [{ domain: 'bank.com' }] } }, {}).settings.sites, [{ domain: 'bank.com', extra: [], level: 'site' }]);
+});
+
 test('a file that is not an export is refused', () => {
-  assert.throws(() => prepareImport({ settings: {} }, {}), /not an Exterminator export/);
-  assert.throws(() => prepareImport(null, {}), /not an Exterminator export/);
+  assert.throws(() => prepareImport({ settings: {} }, {}), /not an Tab Chaperone export/);
+  assert.throws(() => prepareImport(null, {}), /not an Tab Chaperone export/);
 });

@@ -1,4 +1,4 @@
-// Welcome page: explains what Exterminator changes and asks for consent before it does anything.
+// Welcome page: explains what Tab Chaperone changes and asks for consent before it does anything.
 import { localizePage } from './lib/i18n.js';
 import { hasConsent, giveConsent } from './lib/storage.js';
 

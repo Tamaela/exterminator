@@ -1,21 +1,21 @@
 {
   "extName": {
-    "message": "Exterminator"
+    "message": "Tab Chaperone"
   },
   "extDescription": {
     "message": "Automatically disables other extensions on sensitive websites (like your bank) and turns them back on when you leave."
   },
   "badgeOnTitle": {
-    "message": "Exterminator: protected mode active ({count} extension(s) turned off)"
+    "message": "Tab Chaperone: protected mode active ({count} extension(s) turned off)"
   },
   "badgePausedTitle": {
-    "message": "Exterminator: paused"
+    "message": "Tab Chaperone: paused"
   },
   "alertTitle": {
     "message": "{name} is no longer \"Always on\""
   },
   "alertMessage": {
-    "message": "Reason: {detail}. Review this in the Exterminator settings."
+    "message": "Reason: {detail}. Review this in the Tab Chaperone settings."
   },
   "alertDetail": {
     "message": "new permissions after update to {version}: {permissions}"
@@ -201,7 +201,7 @@
     "message": "read your most visited sites"
   },
   "popupIncognito": {
-    "message": "⚠ Exterminator does not run in Incognito. Turn on \"Allow in Incognito\" for Exterminator in chrome://extensions."
+    "message": "⚠ Tab Chaperone does not run in Incognito. Turn on \"Allow in Incognito\" for Tab Chaperone in chrome://extensions."
   },
   "popupAlerts": {
     "message": "⚠ {count} extension(s) removed from \"Always on\" after a permission change. Check the settings."
@@ -267,10 +267,10 @@
     "message": "Settings"
   },
   "optionsTitle": {
-    "message": "Exterminator – Settings"
+    "message": "Tab Chaperone – Settings"
   },
   "incognitoWarningHtml": {
-    "message": "<strong>⚠ Not protected in Incognito.</strong> If other extensions are allowed in Incognito, they simply stay on on your bank there. Go to <code>chrome://extensions</code>, click \"Details\" for Exterminator and turn on \"Allow in Incognito\"."
+    "message": "<strong>⚠ Not protected in Incognito.</strong> If other extensions are allowed in Incognito, they simply stay on on your bank there. Go to <code>chrome://extensions</code>, click \"Details\" for Tab Chaperone and turn on \"Allow in Incognito\"."
   },
   "alertsHeading": {
     "message": "⚠ Removed from \"Always on\""
@@ -300,7 +300,7 @@
     "message": "Add"
   },
   "noSites": {
-    "message": "No sites yet. Add one above, or click the Exterminator icon while on a site."
+    "message": "No sites yet. Add one above, or click the Tab Chaperone icon while on a site."
   },
   "remove": {
     "message": "Remove"
@@ -315,10 +315,10 @@
     "message": "Protect every page with a password field"
   },
   "fieldDetectionHelpHtml": {
-    "message": "Extensions are also turned off on sites that aren't in your list (only \"Always on\" stays on). This lasts while the tab shows the page with the field. Chrome will ask for access to all websites for this; Exterminator only checks <em>whether</em> such a field exists and reads nothing else."
+    "message": "Extensions are also turned off on sites that aren't in your list (only \"Always on\" stays on). This lasts while the tab shows the page with the field. Chrome will ask for access to all websites for this; Tab Chaperone only checks <em>whether</em> such a field exists and reads nothing else."
   },
   "detectionDenied": {
-    "message": "Without access to websites, Exterminator cannot detect sensitive fields."
+    "message": "Without access to websites, Tab Chaperone cannot detect sensitive fields."
   },
   "sensitiveLabel": {
     "message": "Other sensitive fields too"
@@ -387,7 +387,7 @@
     "message": "\"{name}\" is high risk: {reasons}. It will be able to read along on your protected pages."
   },
   "confirmManageNote": {
-    "message": "It can also turn other extensions on; Exterminator turns those off again right away, but only trust it if you are sure it is reliable."
+    "message": "It can also turn other extensions on; Tab Chaperone turns those off again right away, but only trust it if you are sure it is reliable."
   },
   "keepOnAnyway": {
     "message": "Keep on anyway"
@@ -420,10 +420,10 @@
     "message": "If an extension is turned on during protected mode, it is turned off again right away and you get a notification. Add it to \"Always on\" or use \"Pause\"."
   },
   "tipManagers": {
-    "message": "Extensions that can manage other extensions (like 1Password) may be \"Always on\"; if they turn another extension on during protected mode, Exterminator turns it off again immediately."
+    "message": "Extensions that can manage other extensions (like 1Password) may be \"Always on\"; if they turn another extension on during protected mode, Tab Chaperone turns it off again immediately."
   },
   "tipUninstall": {
-    "message": "Don't remove or disable Exterminator while protected mode is active: extensions it turned off would stay off."
+    "message": "Don't remove or disable Tab Chaperone while protected mode is active: extensions it turned off would stay off."
   },
   "tipSiteAccess": {
     "message": "Extra layer: restrict the site access of extensions you rarely need on all sites to \"On click\" in chrome://extensions."
@@ -459,7 +459,7 @@
     "message": "Field detection disabled for safety"
   },
   "storageUnrestrictedMessage": {
-    "message": "This Chrome version cannot keep Exterminator's settings out of reach of web pages, so the field detector is not injected. Protection for your configured sites still works."
+    "message": "This Chrome version cannot keep Tab Chaperone's settings out of reach of web pages, so the field detector is not injected. Protection for your configured sites still works."
   },
   "staleTabTitle": {
     "message": "Reopen recommended"
@@ -471,7 +471,7 @@
     "message": "Clipboard not cleared"
   },
   "clipboardFailedMessage": {
-    "message": "Exterminator could not clear the clipboard before turning extensions back on. Copy something harmless to overwrite it."
+    "message": "Tab Chaperone could not clear the clipboard before turning extensions back on. Copy something harmless to overwrite it."
   },
   "allowAgainUnavailable": {
     "message": "Created by an older version: review it and turn it back on in the lists below."
@@ -513,10 +513,10 @@
     "message": "After you leave this site, extensions can use your login session."
   },
   "askHeading": {
-    "message": "Exterminator found a password or code field on {domain}."
+    "message": "Tab Chaperone found a password or code field on {domain}."
   },
   "askQuestion": {
-    "message": "How should Exterminator protect this site? You can change this later."
+    "message": "How should Tab Chaperone protect this site? You can change this later."
   },
   "asksHeading": {
     "message": "Choose a protection level"
@@ -525,34 +525,34 @@
     "message": "Extensions are off on {domain}"
   },
   "askNotifyMessage": {
-    "message": "Click to choose how Exterminator protects this site."
+    "message": "Click to choose how Tab Chaperone protects this site."
   },
   "badgeAskTitle": {
-    "message": "Exterminator: choose how to protect a site"
+    "message": "Tab Chaperone: choose how to protect a site"
   },
   "loginOnlyStatus": {
     "message": "Protected only on pages with a password, code or payment field."
   },
   "popupReload": {
-    "message": "Version {version} is on disk but not loaded. Reload Exterminator in chrome://extensions."
+    "message": "Version {version} is on disk but not loaded. Reload Tab Chaperone in chrome://extensions."
   },
   "logStaleTab": {
     "message": "A popup or generated page of {site} was open while other extensions were on. Reopen it."
   },
   "welcomeTitle": {
-    "message": "Welcome to Exterminator"
+    "message": "Welcome to Tab Chaperone"
   },
   "welcomeWhatHeading": {
-    "message": "What Exterminator changes"
+    "message": "What Tab Chaperone changes"
   },
   "welcomeWhat1": {
-    "message": "On websites you choose, such as your bank, Exterminator turns off your other extensions. It turns them back on when you leave."
+    "message": "On websites you choose, such as your bank, Tab Chaperone turns off your other extensions. It turns them back on when you leave."
   },
   "welcomeWhat2": {
     "message": "You choose which extensions stay on, such as your password manager."
   },
   "welcomeWhat3": {
-    "message": "For sites with the level Strict, Exterminator logs you out when you leave. It clears the site's cookies, the site data and the clipboard."
+    "message": "For sites with the level Strict, Tab Chaperone logs you out when you leave. It clears the site's cookies, the site data and the clipboard."
   },
   "welcomeWhat4": {
     "message": "Automatic protection is optional. It turns extensions off on any page with a password, code or payment field. Chrome asks for access to all websites when you turn it on."
@@ -561,7 +561,7 @@
     "message": "Your data"
   },
   "welcomeData1": {
-    "message": "Everything stays in your browser. Exterminator sends no data anywhere and has no analytics."
+    "message": "Everything stays in your browser. Tab Chaperone sends no data anywhere and has no analytics."
   },
   "welcomeData2": {
     "message": "Automatic protection only checks whether a page has such a field. It does not read what you type or what the page shows."
@@ -570,25 +570,25 @@
     "message": "Good to know"
   },
   "welcomeNote1": {
-    "message": "If you turn Exterminator off or remove it while a protected site is open, your other extensions stay off. Turn them back on in chrome://extensions."
+    "message": "If you turn Tab Chaperone off or remove it while a protected site is open, your other extensions stay off. Turn them back on in chrome://extensions."
   },
   "welcomeNote2": {
     "message": "Nothing is turned off until you agree below."
   },
   "welcomeAgree": {
-    "message": "I understand, turn on Exterminator"
+    "message": "I understand, turn on Tab Chaperone"
   },
   "welcomeAgreed": {
-    "message": "✓ Exterminator is on. Add your first protected site in the settings."
+    "message": "✓ Tab Chaperone is on. Add your first protected site in the settings."
   },
   "welcomeOpenSettings": {
     "message": "Open settings"
   },
   "badgeSetupTitle": {
-    "message": "Exterminator: finish setup to turn on protection"
+    "message": "Tab Chaperone: finish setup to turn on protection"
   },
   "popupSetup": {
-    "message": "Exterminator is not on yet. Open the welcome page to turn it on."
+    "message": "Tab Chaperone is not on yet. Open the welcome page to turn it on."
   },
   "popupSetupButton": {
     "message": "Open welcome page"
@@ -612,7 +612,7 @@
     "message": "Settings imported. These extensions were allowed in the file but never approved in this profile, so they stay off: {names}. Turn them on in the lists if you trust them."
   },
   "importFailed": {
-    "message": "This file is not an Exterminator export."
+    "message": "This file is not an Tab Chaperone export."
   },
   "offWhileProtected": {
     "message": "off while a protected site is open"

@@ -10,7 +10,7 @@ import { DETECTOR_ORIGINS } from './lib/detection.js';
 localizePage();
 
 const $ = (id) => document.getElementById(id);
-const SORT_KEY = 'exterminator-sort';
+const SORT_KEY = 'tab-chaperone-sort';
 
 // Sort preference is a per-viewer convenience, so localStorage is fine.
 let sortMode = 'risk';
@@ -30,7 +30,7 @@ function sortExtensions(exts) {
 // Remember which <details> are open between renders.
 const openDetails = new Set();
 
-// Extensions Exterminator turned off right now, to explain why they are off.
+// Extensions Tab Chaperone turned off right now, to explain why they are off.
 let offByUs = new Set();
 
 // A small high, medium or low label.
@@ -224,7 +224,7 @@ $('clear-log').addEventListener('click', clearLog);
 // Export: the settings as a JSON file in your downloads.
 $('export').addEventListener('click', async () => {
   const blob = new Blob([JSON.stringify(await exportSettings(), null, 2)], { type: 'application/json' });
-  const link = el('a', { href: URL.createObjectURL(blob), download: 'exterminator-settings.json' });
+  const link = el('a', { href: URL.createObjectURL(blob), download: 'tab-chaperone-settings.json' });
   link.click();
   URL.revokeObjectURL(link.href);
 });

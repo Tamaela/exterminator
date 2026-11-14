@@ -1,5 +1,5 @@
 {
-  "name": "exterminator",
+  "name": "tab-chaperone",
   "private": true,
   "description": "Chrome extension that disables other extensions on sensitive websites.",
   "license": "MIT",

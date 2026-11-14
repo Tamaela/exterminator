@@ -6,10 +6,10 @@
 // after; in between only the nodes that were actually added or changed are examined.
 (() => {
   // Injected again into a page that already has a detector (after field detection was turned
-  // back on, or after Exterminator restarted): if that detector still belongs to a live
-  // Exterminator, make it scan again and report anew; if it is orphaned (its extension context
+  // back on, or after Tab Chaperone restarted): if that detector still belongs to a live
+  // Tab Chaperone, make it scan again and report anew; if it is orphaned (its extension context
   // is gone), take over. A page element with this name is not a detector (no `rescan`).
-  const previous = globalThis.__exterminatorDetector;
+  const previous = globalThis.__tabChaperoneDetector;
   if (previous && typeof previous.rescan === 'function' && previous.alive()) {
     previous.rescan();
     return;
@@ -31,8 +31,8 @@
   // Late full scans catch web components that attach a shadow root after being inserted.
   const LATE_SCANS_MS = [1000, 3000, 10000];
 
-  // Strict check: a page element named "__exterminatorExtended" must not count as true.
-  let sensitive = globalThis.__exterminatorExtended === true;
+  // Strict check: a page element named "__tabChaperoneExtended" must not count as true.
+  let sensitive = globalThis.__tabChaperoneExtended === true;
   // Content scripts can open closed shadow roots too; other extensions can, so we must look.
   const openOrClosed = globalThis.chrome?.dom?.openOrClosedShadowRoot;
   // The shadow root of an element, open or closed.
@@ -149,7 +149,7 @@
     restart();
   }
 
-  globalThis.__exterminatorDetector = {
+  globalThis.__tabChaperoneDetector = {
     alive: () => {
       try {
         return !!chrome.runtime?.id;
@@ -158,7 +158,7 @@
       }
     },
     rescan: () => {
-      sensitive = globalThis.__exterminatorExtended === true; // the mode may have changed
+      sensitive = globalThis.__tabChaperoneExtended === true; // the mode may have changed
       restart();
     },
     stop: () => {

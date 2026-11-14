@@ -14,12 +14,12 @@ import {
 // Grace period before extensions come back or a site is cleaned up, so that
 // redirects between (protected) domains don't cause on/off/on flapping.
 const GRACE_MS = 3000;
-const CHECK_ALARM = 'exterminator-check';
-const AUDIT_ALARM = 'exterminator-audit';
+const CHECK_ALARM = 'tab-chaperone-check';
+const AUDIT_ALARM = 'tab-chaperone-audit';
 const AUDIT_MINUTES = 30;
 // While protected mode is active, permissions of allowed extensions are re-checked every minute
 // (permissions granted at runtime fire no event).
-const FAST_AUDIT_ALARM = 'exterminator-audit-active';
+const FAST_AUDIT_ALARM = 'tab-chaperone-audit-active';
 const DETECTOR_ID = 'field-detector';
 const NOTIFY = { intrusion: 'intrusion', frame: 'frame-', stale: 'stale-', disableFailed: 'disable-failed', clipboard: 'clipboard-failed', ask: ASK_NOTIFICATION };
 
@@ -62,7 +62,7 @@ function requestCheck() {
 // Writes an error to the console and the activity log.
 async function logError(contextKey, params, err) {
   const message = err?.message || String(err);
-  console.warn('[Exterminator]', contextKey, params, err);
+  console.warn('[Tab Chaperone]', contextKey, params, err);
   try {
     await addLog({ type: 'error', context: t(contextKey, params), message });
   } catch {
@@ -174,7 +174,7 @@ const tracker = createTabTracker({
 const { flagTab, recheckTab, isFlaggedPage, forgetTab, recordLoad, recordOpener, recordFrame, recordPrerender, replaceTab } = tracker;
 
 // Protected hosts in the sub-frames a tab has right now. Needed when frames exist without a
-// new commit: a page restored from the back/forward cache, or after Exterminator restarted.
+// new commit: a page restored from the back/forward cache, or after Tab Chaperone restarted.
 async function rescanFrames(tabId) {
   const found = await protectedFrameHosts(tabId);
   for (const host of found) await recordFrame(tabId, host);
@@ -365,7 +365,7 @@ async function syncFastAudit(active) {
   await (active ? chrome.alarms.create(FAST_AUDIT_ALARM, { periodInMinutes: 1 }) : chrome.alarms.clear(FAST_AUDIT_ALARM));
 }
 
-// Set when Chrome has an update for Exterminator: applied once protection is off, because
+// Set when Chrome has an update for Tab Chaperone: applied once protection is off, because
 // restarting clears what we know about open tabs (detected fields, frames).
 let updatePending = false;
 
@@ -683,13 +683,13 @@ chrome.notifications.onButtonClicked.addListener((id) => {
   if (id.startsWith(NOTIFY.frame)) run(() => reloadTab(Number(id.slice(NOTIFY.frame.length))));
 });
 
-// A fresh install opens the welcome page, which explains what Exterminator changes and asks
+// A fresh install opens the welcome page, which explains what Tab Chaperone changes and asks
 // for consent.
 chrome.runtime.onInstalled.addListener(({ reason }) => {
   if (reason === 'install') chrome.tabs.create({ url: 'welcome.html' });
 });
 
-// Chrome has a new version of Exterminator ready.
+// Chrome has a new version of Tab Chaperone ready.
 chrome.runtime.onUpdateAvailable.addListener(() => {
   updatePending = true;
   run(async () => {
@@ -707,7 +707,7 @@ async function restrictStorage() {
     storageRestricted = true;
   } catch (err) {
     storageRestricted = false;
-    console.warn('[Exterminator] storage.local could not be restricted:', err?.message);
+    console.warn('[Tab Chaperone] storage.local could not be restricted:', err?.message);
   }
 }
 
@@ -722,6 +722,8 @@ async function boot() {
   // Marked first: if a later step hangs or fails, the next worker start must not repeat it.
   await markBooted();
   await chrome.alarms.create(AUDIT_ALARM, { periodInMinutes: AUDIT_MINUTES });
+  // Alarms from before the rename to Tab Chaperone.
+  for (const old of ['exterminator-check', 'exterminator-audit', 'exterminator-audit-active']) await chrome.alarms.clear(old);
   try {
     // After an update or restart, what we knew about open pages is gone: rebuild it before the
     // first check, so tabs protected by a frame or a detected field don't lose protection.

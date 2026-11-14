@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "Exterminator test dummy",
+  "name": "Tab Chaperone test dummy",
   "version": "1.0",
-  "description": "An extension that does nothing. The browser tests check that Exterminator turns it off and on."
+  "description": "An extension that does nothing. The browser tests check that Tab Chaperone turns it off and on."
 }

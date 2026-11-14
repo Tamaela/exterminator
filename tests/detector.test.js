@@ -11,7 +11,7 @@ async function detect(html, { act, extended = false, before } = {}) {
   const { window } = new JSDOM(html, { runScripts: 'outside-only' });
   const messages = [];
   window.chrome = { runtime: { sendMessage: (msg) => { messages.push(JSON.parse(JSON.stringify(msg))); return Promise.resolve(); } } };
-  if (extended) window.__exterminatorExtended = true; // what detector-extended.js does
+  if (extended) window.__tabChaperoneExtended = true; // what detector-extended.js does
   before?.(window);
   window.eval(code);
   await wait(20);
@@ -156,19 +156,19 @@ test('injecting the detector again makes a live detector scan and report anew', 
 
 test('an orphaned detector does not block a new one', async () => {
   const before = (w) => {
-    w.eval(code); // detector of an Exterminator instance that is gone (no runtime.id)
+    w.eval(code); // detector of an Tab Chaperone instance that is gone (no runtime.id)
     w.chrome.runtime.id = 'self';
   };
   const messages = await detect('<button></button>', { before, act: (w) => addPassword(w.document.body, w.document) });
   assert.equal(messages.length, 1, 'only the new detector reports');
 });
 
-test('a page element named __exterminatorDetector does not stop detection', async () => {
-  const before = (w) => { w.__exterminatorDetector = w.document.createElement('a'); };
+test('a page element named __tabChaperoneDetector does not stop detection', async () => {
+  const before = (w) => { w.__tabChaperoneDetector = w.document.createElement('a'); };
   assert.equal(await count('<input type="password">', { before }), 1);
 });
 
-test('a page element named __exterminatorExtended does not switch on extended mode', async () => {
-  const before = (w) => { w.__exterminatorExtended = w.document.createElement('a'); };
+test('a page element named __tabChaperoneExtended does not switch on extended mode', async () => {
+  const before = (w) => { w.__tabChaperoneExtended = w.document.createElement('a'); };
   assert.equal(await count('<input autocomplete="cc-number">', { before }), 0);
 });

@@ -1,4 +1,4 @@
-// Browser tests: Exterminator in a real Chrome (Chrome for Testing, installed by Puppeteer).
+// Browser tests: Tab Chaperone in a real Chrome (Chrome for Testing, installed by Puppeteer).
 // They check the whole chain: navigation events, the detector, turning extensions off and on.
 // Run with `npm run test:chrome`. Slower than `npm test`, so kept separate.
 import { test } from 'node:test';
@@ -17,7 +17,7 @@ const FILES = ['manifest.json', '_locales', 'icons', 'lib', 'background.js', 'de
 // A copy of the extension with website access granted at install: in the real extension it is
 // optional and Chrome asks for it, which a test can't click.
 function extensionCopy() {
-  const dir = mkdtempSync(join(tmpdir(), 'exterminator-e2e-'));
+  const dir = mkdtempSync(join(tmpdir(), 'tab-chaperone-e2e-'));
   for (const file of FILES) cpSync(join(ROOT, file), join(dir, file), { recursive: true });
   const manifest = JSON.parse(readFileSync(join(dir, 'manifest.json'), 'utf8'));
   manifest.host_permissions = manifest.optional_host_permissions;
@@ -52,7 +52,7 @@ async function waitFor(check, ms, what) {
   assert.fail(`timed out waiting for: ${what}`);
 }
 
-// Starts Chrome with Exterminator and the dummy, stores `local` and returns helpers.
+// Starts Chrome with Tab Chaperone and the dummy, stores `local` and returns helpers.
 async function start(local) {
   const extension = extensionCopy();
   const server = await startServer();
@@ -62,7 +62,7 @@ async function start(local) {
   });
   const target = await browser.waitForTarget((t) => t.type() === 'service_worker' && t.url().endsWith('/background.js'));
   const worker = await target.worker();
-  const dummyId = await worker.evaluate(async () => (await chrome.management.getAll()).find((e) => e.name === 'Exterminator test dummy').id);
+  const dummyId = await worker.evaluate(async () => (await chrome.management.getAll()).find((e) => e.name === 'Tab Chaperone test dummy').id);
   // Wait for the first start (migration) to finish, or it may overwrite the test settings.
   await waitFor(() => worker.evaluate(async () => (await chrome.storage.session.get('booted')).booted === true), 10000, 'boot');
   await worker.evaluate((items) => chrome.storage.local.set(items), local);
@@ -87,7 +87,7 @@ test('a whole-site protected site turns other extensions off, leaving turns them
   try {
     await chrome.page.goto(chrome.url('127.0.0.1', '/list'));
     await waitFor(async () => !(await chrome.dummyOn()), 8000, 'dummy off');
-    // Exterminator restarts the navigation into a protected site; leaving within milliseconds,
+    // Tab Chaperone restarts the navigation into a protected site; leaving within milliseconds,
     // faster than a person can, would race with that restart.
     await waitFor(() => chrome.page.evaluate(() => location.hostname === '127.0.0.1' && document.readyState === 'complete').catch(() => false), 5000, 'page loaded');
     await new Promise((r) => setTimeout(r, 500));
