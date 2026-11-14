@@ -1,7 +1,7 @@
 import { t, localizePage } from './lib/i18n.js';
 import { riskOf, describePermission, canManageExtensions, sortByRisk, permissionSnapshot } from './lib/risk.js';
 import {
-  KEYS, getSettings, getAlerts, getLog, clearLog, logText, actions, getAsks, exportSettings, importSettings,
+  KEYS, getSettings, getState, getAlerts, getLog, clearLog, logText, actions, getAsks, exportSettings, importSettings,
 } from './lib/storage.js';
 import { el, readDomain, onStorageChange } from './lib/ui.js';
 import { levelPicker, askCards, levelsFor } from './lib/levels.js';
@@ -29,6 +29,9 @@ function sortExtensions(exts) {
 
 // Remember which <details> are open between renders.
 const openDetails = new Set();
+
+// Extensions Exterminator turned off right now, to explain why they are off.
+let offByUs = new Set();
 
 // A small high, medium or low label.
 function riskBadge(risk) {
@@ -76,7 +79,8 @@ function extList(exts, { isChecked, onToggle, lock }) {
       },
     });
     const icon = ext.icons?.length ? [...ext.icons].sort((a, b) => a.size - b.size).find((i) => i.size >= 16) || ext.icons[0] : null;
-    const notes = [locked?.note, !ext.enabled && t('turnedOff')].filter(Boolean);
+    const off = !ext.enabled && (offByUs.has(ext.id) ? t('offWhileProtected') : t('turnedOff'));
+    const notes = [locked?.note, off].filter(Boolean);
     row.append(
       el('label', {}, box,
         icon && el('img', { src: icon.url, alt: '', onerror: (e) => e.target.remove() }),
@@ -125,7 +129,7 @@ function renderAsks(asks, settings) {
 // The newest activity log entries.
 function renderLog(log) {
   $('log').replaceChildren(...(log.length
-    ? log.slice(0, 100).map((entry) => el('li', { className: entry.type === 'error' ? 'error' : '' },
+    ? log.map((entry) => el('li', { className: entry.type === 'error' ? 'error' : '' },
       el('time', { textContent: new Date(entry.t).toLocaleString() }),
       el('span', { textContent: logText(entry) })))
     : [el('li', { className: 'muted', textContent: t('logEmpty') })]));
@@ -157,9 +161,10 @@ function renderSites(settings, exts) {
 
 // Draws the whole settings page from storage.
 async function render() {
-  const [settings, all, alerts, log, incognitoAllowed, asks] = await Promise.all([
-    getSettings(), chrome.management.getAll(), getAlerts(), getLog(), chrome.extension.isAllowedIncognitoAccess(), getAsks(),
+  const [settings, all, alerts, log, incognitoAllowed, asks, state] = await Promise.all([
+    getSettings(), chrome.management.getAll(), getAlerts(), getLog(), chrome.extension.isAllowedIncognitoAccess(), getAsks(), getState(),
   ]);
+  offByUs = new Set(state.disabledByUs);
   const exts = sortExtensions(all.filter((e) => e.id !== chrome.runtime.id && e.type !== 'theme'));
 
   $('incognito-warning').hidden = incognitoAllowed;
@@ -254,7 +259,7 @@ $('sort').addEventListener('change', (e) => {
   render();
 });
 
-onStorageChange([KEYS.settings, KEYS.alerts, KEYS.log, KEYS.asks], render);
+onStorageChange([KEYS.settings, KEYS.alerts, KEYS.log, KEYS.asks, KEYS.state], render);
 // Redraw when extensions are installed, removed, turned on or off.
 for (const event of ['onInstalled', 'onUninstalled', 'onEnabled', 'onDisabled']) chrome.management[event].addListener(render);
 

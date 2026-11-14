@@ -381,7 +381,7 @@
     "message": "always on"
   },
   "turnedOff": {
-    "message": "turned off"
+    "message": "turned off in Chrome"
   },
   "confirmHighRisk": {
     "message": "\"{name}\" is high risk: {reasons}. It will be able to read along on your protected pages."
@@ -613,5 +613,11 @@
   },
   "importFailed": {
     "message": "This file is not an Exterminator export."
+  },
+  "offWhileProtected": {
+    "message": "off while a protected site is open"
+  },
+  "logIntro": {
+    "message": "The log keeps the last 200 entries. Older entries are removed automatically."
   }
 }
