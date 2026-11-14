@@ -612,7 +612,7 @@
     "message": "Settings imported. These extensions were allowed in the file but never approved in this profile, so they stay off: {names}. Turn them on in the lists if you trust them."
   },
   "importFailed": {
-    "message": "This file is not an Tab Chaperone export."
+    "message": "This file is not a Tab Chaperone export."
   },
   "offWhileProtected": {
     "message": "off while a protected site is open"
