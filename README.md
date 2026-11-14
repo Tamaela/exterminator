@@ -77,6 +77,15 @@ so a tab that becomes protected is reloaded if it was loaded while those extensi
   in an iframe can turn them off for as long as it stays open.
 - "Log out when leaving" can't clear incognito data (Chrome doesn't allow it); the log says so.
   Closing all incognito windows removes it.
+- "Log out when leaving" only applies to sites you opened as a page yourself: a site that was
+  only embedded in an iframe or prerendered by another page is never logged out. When you leave
+  such a site for another protected site, extensions that site allows come back only after the
+  logout (and clipboard clearing) has run.
+- Popups and generated pages (about:blank, blob:) of a protected site are protected but can't be
+  reloaded; if they were open while other extensions were on, you get a notification to reopen them.
+- "Allow again" on an alert created by version 0.5.0 or older is not possible (it doesn't record
+  which permissions you saw); review the extension and turn it back on in the lists.
+- Apps are turned off like extensions; themes are left alone (they can't run code).
 - If Chrome can't keep Exterminator's settings out of reach of web pages, automatic field
   detection stays off and you get a notification; configured sites are still protected.
 - An update of Exterminator waits until protected mode is off.

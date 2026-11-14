@@ -66,6 +66,24 @@ test('audit fix: "Allow again" approves the permissions shown in the alert, in o
   assert.deepEqual((await chrome.storage.local.get('alerts')).alerts, []);
 });
 
+test('run-3 fix: "Allow again" refuses alerts without a stored snapshot', async () => {
+  chrome.storage.local.reset({ settings: normalizeSettings({}), alerts: [{ id: 'x', added: ['tabs'], where: { global: true, sites: [] } }] });
+  assert.equal(await actions.allowAgain('x'), false);
+  const { settings, alerts, approvals } = await chrome.storage.local.get(['settings', 'alerts', 'approvals']);
+  assert.deepEqual(settings.globalWhitelist, []);
+  assert.equal(alerts.length, 1);
+  assert.equal(approvals, undefined);
+});
+
+test('run-3 fix: allowing an extension stores the permissions you saw, without replacing an older approval', async () => {
+  const seen = { version: '1', permissions: ['storage'], hostPermissions: [] };
+  await actions.setAlwaysOn('a', true, seen);
+  await actions.setSiteExtra('bank.com', 'a', true, { version: '2', permissions: ['cookies'], hostPermissions: [] });
+  const { settings, approvals } = await chrome.storage.local.get(['settings', 'approvals']);
+  assert.deepEqual(settings.globalWhitelist, ['a']);
+  assert.deepEqual(approvals.a, seen);
+});
+
 test('audit fix: a pause is bound to sites and a time', async () => {
   await pauseFor(['bank.com'], 1000);
   assert.deepEqual(await isPaused(), { sites: ['bank.com'], until: 1000 + PAUSE_MAX_MS });

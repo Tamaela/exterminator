@@ -257,3 +257,65 @@ test('removeFromAllowlists remembers where an extension was', () => {
   assert.deepEqual(settings.globalWhitelist, []);
   assert.deepEqual(settings.sites[0].extra, ['b']);
 });
+
+test('run-3 fix: a site that was only framed or prerendered is never logged out', () => {
+  const settings = normalizeSettings({ sites: [{ domain: 'bank.com', cleanup: true }] });
+  const framed = plan(input({ settings, frameUrls: ['https://bank.com/'], tabs: [{ id: 1, url: 'https://evil.com/' }], framedTabs: { 1: ['bank.com'] } }));
+  assert.deepEqual(framed.nextState.seenSites, []);
+  assert.deepEqual(framed.nextState.siteHosts, {});
+  const gone = plan(input({ settings, state: framed.nextState, tabs: [{ id: 1, url: 'https://evil.com/' }] }));
+  const later = plan(input({ now: NOW + GRACE, settings, state: gone.nextState, tabs: [{ id: 1, url: 'https://evil.com/' }] }));
+  assert.deepEqual(later.cleanup, []);
+});
+
+test('run-3 fix: a visited site stays "seen" while it is still open in an iframe', () => {
+  const settings = normalizeSettings({ sites: [{ domain: 'bank.com', cleanup: true }] });
+  const visit = plan(input({ settings, tabs: [{ id: 1, url: 'https://bank.com/' }] }));
+  const framed = plan(input({ settings, state: visit.nextState, tabs: [{ id: 1, url: 'https://shop.com/' }], framedTabs: { 1: ['acs.bank.com'] } }));
+  assert.deepEqual(framed.nextState.seenSites, ['bank.com']);
+  assert.deepEqual(framed.cleanup, []);
+  const left = plan(input({ settings, state: framed.nextState, tabs: [{ id: 1, url: 'https://shop.com/' }] }));
+  const later = plan(input({ now: NOW + GRACE, settings, state: left.nextState, tabs: [{ id: 1, url: 'https://shop.com/' }] }));
+  assert.equal(later.cleanup.length, 1, 'logged out once it is really gone');
+});
+
+test('run-3 fix: extensions allowed on the remaining site wait for the left site to be logged out', () => {
+  const settings = normalizeSettings({ sites: [{ domain: 'bank.com', cleanup: true }, { domain: 'tax.gov', extra: ['ads'] }], globalWhitelist: ['pw'], clearClipboard: true });
+  const both = plan(input({ settings, tabs: [{ id: 1, url: 'https://bank.com/' }, { id: 2, url: 'https://tax.gov/' }] }));
+  assert.deepEqual(both.disable.sort(), ['ads', 'grammar']);
+  const exts = [ext('pw'), off('ads'), off('grammar')];
+  const left = plan(input({ settings, extensions: exts, state: both.nextState, tabs: [{ id: 2, url: 'https://tax.gov/' }] }));
+  assert.deepEqual(left.enable, [], 'not before bank.com is logged out');
+  assert.ok(left.nextState.disabledByUs.includes('ads'));
+  const later = plan(input({ now: NOW + GRACE, settings, extensions: exts, state: left.nextState, tabs: [{ id: 2, url: 'https://tax.gov/' }] }));
+  assert.equal(later.cleanup[0].domain, 'bank.com');
+  assert.deepEqual(later.enable, ['ads'], 'after the cleanup, in the same check');
+  assert.equal(later.clearClipboard, true);
+});
+
+test('run-3 fix: a stricter protected iframe inside a protected page gets a warning on a later disable', () => {
+  const settings = normalizeSettings({ sites: [{ domain: 'shop.com', extra: ['E'] }, { domain: 'bank.com', extra: ['E'] }], globalWhitelist: [] });
+  const tabs = [{ id: 5, url: 'https://shop.com/' }];
+  const first = plan(input({ settings, extensions: [ext('E')], tabs, framedTabs: { 5: ['acs.bank.com'] }, loadTimes: { 5: 1 } }));
+  assert.deepEqual(first.disable, []);
+  const stricter = normalizeSettings({ sites: [{ domain: 'shop.com', extra: ['E'] }, { domain: 'bank.com' }], globalWhitelist: [] });
+  const p = plan(input({ settings: stricter, extensions: [ext('E')], state: first.nextState, tabs, framedTabs: { 5: ['acs.bank.com'] }, loadTimes: { 5: 1 } }));
+  assert.deepEqual(p.disable, ['E']);
+  assert.deepEqual(p.reloadTabIds, [], 'shop.com itself still allows E');
+  assert.deepEqual(p.frameRace, [{ tabId: 5, domain: 'bank.com' }]);
+});
+
+test('run-3 fix: a popup opened by a protected page stays protected after the opener leaves, and gets a warning instead of a reload', () => {
+  const tabs = [{ id: 1, url: 'https://news.com/' }, { id: 2, url: 'about:blank', openerTabId: 1 }];
+  const p = plan(input({ tabs, inheritedTabs: { 2: { host: 'bank.com', auto: false } } }));
+  assert.deepEqual(p.nextState.activeSites, ['bank.com']);
+  assert.deepEqual(p.reloadTabIds, []);
+  assert.deepEqual(p.staleTabs, [{ tabId: 2, domain: 'bank.com' }]);
+  const detected = plan(input({ settings: normalizeSettings({ fieldDetection: true }), tabs, inheritedTabs: { 2: { host: 'shop.com', auto: true } } }));
+  assert.deepEqual(detected.nextState.activeSites, ['shop.com']);
+});
+
+test('run-3 fix: apps are turned off too, themes are left alone', () => {
+  const p = plan(input({ tabs: [{ id: 1, url: 'https://bank.com/' }], extensions: [ext('pw'), ext('app', { type: 'hosted_app' }), ext('look', { type: 'theme' })] }));
+  assert.deepEqual(p.disable, ['app']);
+});

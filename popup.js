@@ -1,7 +1,7 @@
 import { t, localizePage } from './lib/i18n.js';
 import { suggestDomain } from './lib/domains.js';
 import { describeTab } from './lib/planner.js';
-import { riskOf } from './lib/risk.js';
+import { riskOf, permissionSnapshot } from './lib/risk.js';
 import { KEYS, getSettings, getState, isPaused, setPaused, pauseFor, getAlerts, getFlaggedTabs, actions } from './lib/storage.js';
 import { el, readDomain, onStorageChange } from './lib/ui.js';
 
@@ -81,7 +81,7 @@ function allowButton(ext) {
       btn.className = 'danger small';
       return;
     }
-    actions.setAlwaysOn(ext.id, true);
+    actions.setAlwaysOn(ext.id, true, permissionSnapshot(ext));
   });
   return btn;
 }

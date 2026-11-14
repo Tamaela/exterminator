@@ -5,9 +5,16 @@
 // Cost model: one full scan when the page starts, at DOMContentLoaded/load and a few times
 // after; in between only the nodes that were actually added or changed are examined.
 (() => {
-  // Injected again into already-open pages after Exterminator restarts: run only once.
-  if (globalThis.__exterminatorDetector === true) return;
-  globalThis.__exterminatorDetector = true;
+  // Injected again into a page that already has a detector (after field detection was turned
+  // back on, or after Exterminator restarted): if that detector still belongs to a live
+  // Exterminator, make it scan again and report anew; if it is orphaned (its extension context
+  // is gone), take over. A page element with this name is not a detector (no `rescan`).
+  const previous = globalThis.__exterminatorDetector;
+  if (previous && typeof previous.rescan === 'function' && previous.alive()) {
+    previous.rescan();
+    return;
+  }
+  previous?.stop?.();
 
   const PASSWORD = 'input[type="password" i]';
   const SENSITIVE_AUTOCOMPLETE = new Set([
@@ -25,7 +32,7 @@
   const LATE_SCANS_MS = [1000, 3000, 10000];
 
   // Strict check: a page element named "__exterminatorExtended" must not count as true.
-  const sensitive = globalThis.__exterminatorExtended === true;
+  let sensitive = globalThis.__exterminatorExtended === true;
   // Content scripts can open closed shadow roots too; other extensions can, so we must look.
   const openOrClosed = globalThis.chrome?.dom?.openOrClosedShadowRoot;
   const shadowOf = (el) => {
@@ -122,15 +129,36 @@
   });
   observer.observe(document, OBSERVE);
 
-  // Re-arm when the same document becomes current again.
-  function rearm() {
+  function restart() {
     reported = false;
     found = false;
-    reused = true;
     watchedRoots = new WeakSet();
     observer.observe(document, OBSERVE);
     fullScan();
   }
+  // Re-arm when the same document becomes current again.
+  function rearm() {
+    reused = true;
+    restart();
+  }
+
+  globalThis.__exterminatorDetector = {
+    alive: () => {
+      try {
+        return !!chrome.runtime?.id;
+      } catch {
+        return false;
+      }
+    },
+    rescan: () => {
+      sensitive = globalThis.__exterminatorExtended === true; // the mode may have changed
+      restart();
+    },
+    stop: () => {
+      reported = true; // never reports again
+      observer.disconnect();
+    },
+  };
   window.addEventListener('pageshow', (e) => {
     if (e.persisted) rearm(); // restored from the back/forward cache
   });

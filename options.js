@@ -1,5 +1,5 @@
 import { t, localizePage } from './lib/i18n.js';
-import { riskOf, describePermission, canManageExtensions, sortByRisk } from './lib/risk.js';
+import { riskOf, describePermission, canManageExtensions, sortByRisk, permissionSnapshot } from './lib/risk.js';
 import {
   KEYS, getSettings, getAlerts, getLog, clearLog, logText, actions,
 } from './lib/storage.js';
@@ -65,11 +65,11 @@ function extList(exts, { isChecked, onToggle, lock }) {
         if (on && risk.level === 'high') {
           e.target.checked = false;
           row.querySelector('.confirm')?.remove();
-          const panel = confirmPanel(ext, risk, () => onToggle(ext.id, true), () => panel.remove());
+          const panel = confirmPanel(ext, risk, () => onToggle(ext.id, true, ext), () => panel.remove());
           row.append(panel);
           return;
         }
-        onToggle(ext.id, on);
+        onToggle(ext.id, on, ext);
       },
     });
     const icon = ext.icons?.length ? [...ext.icons].sort((a, b) => a.size - b.size).find((i) => i.size >= 16) || ext.icons[0] : null;
@@ -95,11 +95,9 @@ function renderAlerts(alerts) {
       el('strong', { textContent: `${a.name} ${a.version}` }),
       el('div', { className: 'muted', textContent: t('newPermissions', { list: (a.added || []).map(describePermission).join('; ') }) })),
     el('div', { className: 'row' },
-      el('button', {
-        className: 'secondary small',
-        textContent: t('allowAgain'),
-        onclick: () => actions.allowAgain(a.id),
-      }),
+      a.approved
+        ? el('button', { className: 'secondary small', textContent: t('allowAgain'), onclick: () => actions.allowAgain(a.id) })
+        : el('span', { className: 'note', textContent: t('allowAgainUnavailable') }),
       el('button', { className: 'secondary small', textContent: t('dismiss'), onclick: () => actions.dismissAlert(a.id) })))));
 }
 
@@ -128,7 +126,7 @@ function renderSites(settings, exts) {
       el('summary', { textContent: t('alsoOnForSite', { count: site.extra.length }) }),
       el('ul', { className: 'ext-list' }, ...extList(exts, {
         isChecked: (id) => site.extra.includes(id),
-        onToggle: (id, on) => actions.setSiteExtra(site.domain, id, on),
+        onToggle: (id, on, ext) => actions.setSiteExtra(site.domain, id, on, permissionSnapshot(ext)),
         lock: (ext) => policyLock(ext) || (globalSet.has(ext.id) ? { checked: true, note: t('alwaysOnNote') } : null),
       })));
     details.addEventListener('toggle', () => {
@@ -149,7 +147,7 @@ async function render() {
   const [settings, all, alerts, log, incognitoAllowed] = await Promise.all([
     getSettings(), chrome.management.getAll(), getAlerts(), getLog(), chrome.extension.isAllowedIncognitoAccess(),
   ]);
-  const exts = sortExtensions(all.filter((e) => e.id !== chrome.runtime.id && e.type === 'extension'));
+  const exts = sortExtensions(all.filter((e) => e.id !== chrome.runtime.id && e.type !== 'theme'));
 
   $('incognito-warning').hidden = incognitoAllowed;
   renderAlerts(alerts);
@@ -164,7 +162,7 @@ async function render() {
 
   const globalSet = new Set(settings.globalWhitelist);
   $('global').replaceChildren(...(exts.length
-    ? extList(exts, { isChecked: (id) => globalSet.has(id), onToggle: actions.setAlwaysOn, lock: policyLock })
+    ? extList(exts, { isChecked: (id) => globalSet.has(id), onToggle: (id, on, ext) => actions.setAlwaysOn(id, on, permissionSnapshot(ext)), lock: policyLock })
     : [el('li', { className: 'muted', textContent: t('noOtherExtensions') })]));
 }
 

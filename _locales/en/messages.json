@@ -466,5 +466,20 @@
   },
   "storageUnrestrictedMessage": {
     "message": "This Chrome version cannot keep Exterminator's settings out of reach of web pages, so the field detector is not injected. Protection for your configured sites still works."
+  },
+  "staleTabTitle": {
+    "message": "Reopen recommended"
+  },
+  "staleTabMessage": {
+    "message": "A protected page from {site} that can't be reloaded (a popup or a generated page) was open while other extensions were still on. Close it and open it again from the site to be safe."
+  },
+  "clipboardFailedTitle": {
+    "message": "Clipboard not cleared"
+  },
+  "clipboardFailedMessage": {
+    "message": "Exterminator could not clear the clipboard before turning extensions back on. Copy something harmless to overwrite it."
+  },
+  "allowAgainUnavailable": {
+    "message": "Created by an older version: review it and turn it back on in the lists below."
   }
 }

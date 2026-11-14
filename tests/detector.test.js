@@ -147,8 +147,24 @@ test('audit fix: a text field masked with -webkit-text-security counts as a pass
   assert.equal(await count('<input id="name">'), 0);
 });
 
-test('audit fix: injecting the detector twice into the same page reports once', async () => {
-  const before = (w) => w.eval(code); // e.g. registered script plus re-injection after a restart
+test('run-3 fix: injecting the detector again makes a live detector scan and report anew', async () => {
+  const before = (w) => { w.chrome.runtime.id = 'self'; };
+  const act = (w) => w.eval(code); // e.g. field detection turned back on
+  const messages = await detect('<input type="password">', { before, act });
+  assert.equal(messages.length, 2, 'reported again, so the background can flag the tab again');
+});
+
+test('run-3 fix: an orphaned detector does not block a new one', async () => {
+  const before = (w) => {
+    w.eval(code); // detector of an Exterminator instance that is gone (no runtime.id)
+    w.chrome.runtime.id = 'self';
+  };
+  const messages = await detect('<button></button>', { before, act: (w) => addPassword(w.document.body, w.document) });
+  assert.equal(messages.length, 1, 'only the new detector reports');
+});
+
+test('a page element named __exterminatorDetector does not stop detection', async () => {
+  const before = (w) => { w.__exterminatorDetector = w.document.createElement('a'); };
   assert.equal(await count('<input type="password">', { before }), 1);
 });
 
