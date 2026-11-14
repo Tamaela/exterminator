@@ -43,6 +43,7 @@ so a tab that becomes protected is reloaded if it was loaded while those extensi
 |---|---|
 | `background.js` | Service worker: events, applying plans, permission monitoring |
 | `detector.js` | Optional content script that reports sensitive fields (never page content) |
+| `detector-extended.js` | Turns on extended field detection; registered only when that option is on |
 | `popup.*`, `options.*` | Toolbar popup and settings page |
 | `offscreen.*` | Hidden document used only to clear the clipboard |
 | `lib/planner.js` | Pure decision logic (fully unit tested) |
@@ -70,11 +71,18 @@ so a tab that becomes protected is reloaded if it was loaded while those extensi
 - Fields inside *closed* Shadow DOM can't be seen by any extension; web components that attach
   a shadow root long after the page loaded are caught when you focus the field.
 - An "Always on" extension is fully trusted on protected pages.
+- A protected site inside an iframe turns protection on as soon as the frame starts loading.
+  The frame is not reloaded automatically (it may be a payment step); if it loaded before
+  extensions were off, you get a notification with a reload button.
+- An extension with the `management` permission could turn Exterminator itself off; Chrome offers
+  no way to prevent or detect that from inside the extension.
+- Without "Allow in Incognito", protection does not apply in incognito windows.
 
 ## Development
 
 ```sh
 npm install   # jsdom, for the detector tests
-npm test      # 41 tests: planner, storage/migrations, domains, risk, i18n keys, detector
+npm test      # 51 tests: planner, storage/migrations, domains, risk, i18n, UI helpers, detector
 npm run icons # regenerate icons/ (Python 3, no dependencies)
+npm run package # dist/exterminator-<version>.zip without dev files
 ```

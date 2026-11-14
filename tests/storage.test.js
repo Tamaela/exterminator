@@ -11,7 +11,7 @@ beforeEach(() => {
 test('migrates v1 data to the current schema', async () => {
   chrome.storage.local.reset({
     settings: { sites: [{ domain: 'bank.com', extra: [] }], globalWhitelist: ['pw'], passwordDetection: true, paused: true },
-    state: { disabledByUs: ['ads'], autoSites: ['x.com'] },
+    state: { disabledByUs: ['ads'], autoSites: ['x.com'], protectedTabIds: [1], cleanSince: 5 },
     alerts: [{ id: 'a', reason: 'permissions', added: ['cookies'] }],
   });
   assert.equal(await migrate(), true);
@@ -21,7 +21,10 @@ test('migrates v1 data to the current schema', async () => {
   assert.equal('paused' in settings, false);
   assert.equal(settings.sites[0].cleanup, false);
   assert.equal(await isPaused(), true);
-  assert.equal('autoSites' in (await getState()), false);
+  const state = await getState();
+  assert.equal('autoSites' in state, false);
+  assert.equal('protectedTabIds' in state, false);
+  assert.equal('cleanSince' in state, false);
   assert.deepEqual((await getState()).disabledByUs, ['ads']);
   const { alerts, schemaVersion } = await chrome.storage.local.get(['alerts', 'schemaVersion']);
   assert.equal('reason' in alerts[0], false);
@@ -52,4 +55,13 @@ test('log is capped and readable', async () => {
   assert.equal((await getLog()).length, LOG_MAX);
   assert.equal(logText({ type: 'enabled', names: ['A', 'B'] }), 'Turned 2 extension(s) back on: A, B');
   assert.equal(logText({ type: 'error', context: 'reloading a tab', message: 'boom' }), 'Error while reloading a tab: boom');
+});
+
+test('migrates v2 data to v3', async () => {
+  chrome.storage.local.reset({ schemaVersion: 2, settings: { fieldDetection: true }, paused: true, state: { disabledByUs: ['x'], protectedTabIds: [3], cleanSince: 9 } });
+  assert.equal(await migrate(), true);
+  assert.equal(await isPaused(), true);
+  assert.equal((await getSettings()).fieldDetection, true);
+  const { state } = await chrome.storage.local.get('state');
+  assert.deepEqual(state, { disabledByUs: ['x'] });
 });

@@ -1,5 +1,6 @@
 // Content script: tells the background worker as soon as the page contains a sensitive field.
-// Only sends "there is a sensitive field", never any page content.
+// Only sends "there is a sensitive field", never any page content. It does not use
+// chrome.storage: the extended mode arrives via detector-extended.js (see background.js).
 //
 // Cost model: one full scan when the page starts, at DOMContentLoaded/load and a few times
 // after; in between only the nodes that were actually added or changed are examined.
@@ -19,9 +20,13 @@
   // Late full scans catch web components that attach a shadow root after being inserted.
   const LATE_SCANS_MS = [1000, 3000, 10000];
 
-  let sensitive = false; // extended detection (setting)
+  const sensitive = !!globalThis.__exterminatorExtended;
   let reported = false;
-  const watchedRoots = new WeakSet();
+  let found = false;
+  // True for a document that is shown again (back/forward cache) or was prerendered:
+  // it may hold scripts from extensions that were on at the time, so the tab must reload.
+  let reused = false;
+  let watchedRoots = new WeakSet();
 
   function isSensitiveInput(input) {
     if (input.type?.toLowerCase() === 'password') return true;
@@ -32,11 +37,13 @@
   }
 
   function report() {
-    if (reported) return;
+    found = true;
+    // A prerendered page is not visible yet and belongs to no tab the user sees: wait.
+    if (reported || document.prerendering) return;
     reported = true;
     observer.disconnect();
     try {
-      chrome.runtime.sendMessage({ type: 'sensitive-field' }).catch(() => {});
+      chrome.runtime.sendMessage({ type: 'sensitive-field', reused }).catch(() => {});
     } catch {
       // Extension reloaded or context invalidated: ignore.
     }
@@ -66,7 +73,7 @@
   }
 
   function fullScan() {
-    if (!reported && scan(document)) report();
+    if (!reported && (found || scan(document))) report();
   }
 
   const observer = new MutationObserver((records) => {
@@ -83,6 +90,20 @@
   });
   observer.observe(document, OBSERVE);
 
+  // Re-arm when the same document becomes current again.
+  function rearm() {
+    reported = false;
+    found = false;
+    reused = true;
+    watchedRoots = new WeakSet();
+    observer.observe(document, OBSERVE);
+    fullScan();
+  }
+  window.addEventListener('pageshow', (e) => {
+    if (e.persisted) rearm(); // restored from the back/forward cache
+  });
+  document.addEventListener('prerenderingchange', rearm, { once: true }); // prerender activated
+
   // Safety net: focusing a field, also inside a shadow root (composedPath reveals the real field).
   document.addEventListener('focusin', (e) => {
     const target = e.composedPath()[0];
@@ -94,18 +115,6 @@
     fullScan();
     for (const delay of LATE_SCANS_MS) setTimeout(fullScan, delay);
   }, { once: true });
-
-  // Content scripts can't import lib/storage.js; 'settings' must match KEYS.settings there.
-  chrome.storage.local.get('settings').then(({ settings }) => {
-    sensitive = !!settings?.sensitiveFields;
-    fullScan();
-  }).catch(() => {});
-  chrome.storage.onChanged.addListener((changes, area) => {
-    if (area === 'local' && changes.settings) {
-      sensitive = !!changes.settings.newValue?.sensitiveFields;
-      fullScan();
-    }
-  });
 
   fullScan();
 })();

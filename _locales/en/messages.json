@@ -417,7 +417,7 @@
     "message": "Password fields are detected even when hidden or inside (open) Shadow DOM — you never need to click them."
   },
   "tipReload": {
-    "message": "When a tab becomes protected and was loaded while extensions were still on, it is reloaded so scripts those extensions had injected are gone."
+    "message": "A protected tab is reloaded when it was loaded while an extension that this site doesn't allow was still on, so scripts that extension had injected are gone."
   },
   "tipMultipleHtml": {
     "message": "With several protected sites open at once, only extensions allowed on <em>all</em> open sites stay on."
@@ -433,5 +433,26 @@
   },
   "tipSiteAccess": {
     "message": "Extra layer: restrict the site access of extensions you rarely need on all sites to \"On click\" in chrome://extensions."
+  },
+  "logFrameRace": {
+    "message": "A protected frame from {site} loaded before extensions were turned off"
+  },
+  "frameRaceTitle": {
+    "message": "Reload recommended"
+  },
+  "frameRaceMessage": {
+    "message": "A protected frame from {site} started before other extensions were off. Reload the page to be safe (you may need to restart a payment step)."
+  },
+  "reloadTab": {
+    "message": "Reload page"
+  },
+  "disableFailedTitle": {
+    "message": "Could not turn off an extension"
+  },
+  "disableFailedMessage": {
+    "message": "{names} is still on while a protected page is open. Close the protected page or remove the extension."
+  },
+  "tipFrames": {
+    "message": "A protected site loaded inside another page (for example a bank's payment frame in a web shop) also turns protection on."
   }
 }

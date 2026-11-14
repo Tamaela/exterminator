@@ -5,23 +5,32 @@ import { plan, computeAllowed, removeFromAllowlists, DEFAULT_STATE } from '../li
 import { normalizeSettings } from '../lib/storage.js';
 
 const GRACE = 3000;
+const NOW = 100_000;
 const ext = (id, extra = {}) => ({ id, name: id.toUpperCase(), type: 'extension', enabled: true, mayDisable: true, ...extra });
+const off = (id) => ext(id, { enabled: false });
 
 function input(overrides = {}) {
   return {
-    now: 100_000,
+    now: NOW,
     graceMs: GRACE,
     settings: normalizeSettings({ sites: [{ domain: 'bank.com' }, { domain: 'tax.gov' }], globalWhitelist: ['pw'] }),
     state: { ...DEFAULT_STATE },
     paused: false,
     tabs: [],
     flaggedTabs: {},
+    framedTabs: {},
     loadTimes: {},
     extensions: [ext('pw'), ext('ads'), ext('grammar'), ext('self')],
     selfId: 'self',
     ...overrides,
   };
 }
+
+// State after protection has been active for a while (extensions turned off at 90s).
+const activeState = (extra = {}) => ({
+  ...DEFAULT_STATE, disabledByUs: ['ads', 'grammar'], activeSites: ['bank.com'], allowedIds: ['pw'],
+  disabledAt: { ads: 90_000, grammar: 90_000 }, seenSites: ['bank.com'], ...extra,
+});
 
 test('nothing protected: nothing happens', () => {
   const p = plan(input({ tabs: [{ id: 1, url: 'https://news.com/' }] }));
@@ -37,8 +46,8 @@ test('entering a protected site disables everything except "Always on" and ourse
     tabs: [{ id: 1, url: 'https://news.com/' }],
   }));
   assert.deepEqual(p.disable.sort(), ['ads', 'grammar']);
+  assert.deepEqual(p.stamp.sort(), ['ads', 'grammar']);
   assert.deepEqual(p.restartNavigation, { tabId: 1, url: 'https://www.bank.com/' });
-  assert.deepEqual(p.nextState.disabledByUs.sort(), ['ads', 'grammar']);
   assert.equal(p.badge.mode, 'on');
 });
 
@@ -47,14 +56,77 @@ test('already-open protected tabs are reloaded when protection starts', () => {
   assert.deepEqual(p.reloadTabIds, [1]);
 });
 
-test('extensions turned off by the user are not ours to restore', () => {
-  const p = plan(input({ tabs: [{ id: 1, url: 'https://bank.com/' }], extensions: [ext('pw'), ext('off', { enabled: false })] }));
-  assert.deepEqual(p.disable, []);
+test('a tab loaded after extensions went off is not reloaded; one loaded before is', () => {
+  const tabs = [{ id: 1, url: 'https://bank.com/' }, { id: 2, url: 'https://bank.com/a' }];
+  const p = plan(input({ state: activeState(), tabs, loadTimes: { 1: 95_000, 2: 80_000 }, extensions: [ext('pw'), off('ads'), off('grammar')] }));
+  assert.deepEqual(p.reloadTabIds, [2]);
+  const again = plan(input({ state: p.nextState, tabs, loadTimes: { 1: 95_000, 2: 99_000 }, extensions: [ext('pw'), off('ads'), off('grammar')] }));
+  assert.deepEqual(again.reloadTabIds, [], 'no reload loop after the reload');
 });
 
-test('policy-managed extensions are left alone', () => {
-  const p = plan(input({ tabs: [{ id: 1, url: 'https://bank.com/' }], extensions: [ext('corp', { mayDisable: false })] }));
-  assert.deepEqual(p.disable, []);
+test('audit fix: redirect to a stricter protected site reloads the tab', () => {
+  const settings = normalizeSettings({ sites: [{ domain: 'bank.com', extra: ['E'] }, { domain: 'secure.bank.com' }], globalWhitelist: [] });
+  const extensions = [ext('E')];
+  const onA = plan(input({ settings, extensions, tabs: [{ id: 1, url: 'https://bank.com/' }], loadTimes: { 1: 1 } }));
+  assert.deepEqual(onA.disable, []);
+  // Server redirect: the tab commits B while E is still on; no navigation object.
+  const onB = plan(input({ settings, extensions, state: onA.nextState, tabs: [{ id: 1, url: 'https://secure.bank.com/login' }], loadTimes: { 1: NOW - 1 } }));
+  assert.deepEqual(onB.disable, ['E']);
+  assert.deepEqual(onB.intrusion, [], 'E was allowed before: not an intrusion');
+  assert.deepEqual(onB.reloadTabIds, [1], 'the tab is reloaded so E\'s script is gone');
+});
+
+test('audit fix: the same holds through an unprotected page within the grace period', () => {
+  const settings = normalizeSettings({ sites: [{ domain: 'bank.com', extra: ['E'] }, { domain: 'secure.bank.com' }], globalWhitelist: [] });
+  const extensions = [ext('E'), ext('X')];
+  const onA = plan(input({ settings, extensions, tabs: [{ id: 1, url: 'https://bank.com/' }], loadTimes: { 1: 1 } }));
+  const between = plan(input({ settings, extensions: [ext('E'), off('X')], state: onA.nextState, tabs: [{ id: 1, url: 'https://shop.com/' }] }));
+  assert.equal(between.badge.mode, 'on', 'still within grace');
+  const onB = plan(input({ settings, extensions: [ext('E'), off('X')], state: between.nextState, tabs: [{ id: 1, url: 'https://secure.bank.com/' }], loadTimes: { 1: NOW } }));
+  assert.deepEqual(onB.reloadTabIds, [1]);
+});
+
+test('a tab on a site that still allows the extension is not reloaded when the allowed set shrinks', () => {
+  const settings = normalizeSettings({ sites: [{ domain: 'bank.com', extra: ['E'] }, { domain: 'tax.gov' }], globalWhitelist: [] });
+  const onA = plan(input({ settings, extensions: [ext('E')], tabs: [{ id: 1, url: 'https://bank.com/' }], loadTimes: { 1: 1 } }));
+  const both = plan(input({ settings, extensions: [ext('E')], state: onA.nextState,
+    tabs: [{ id: 1, url: 'https://bank.com/' }, { id: 2, url: 'https://tax.gov/' }], loadTimes: { 1: 1, 2: 2 } }));
+  assert.deepEqual(both.disable, ['E']);
+  assert.deepEqual(both.reloadTabIds, [2], 'only the tax.gov tab, where E is not allowed');
+});
+
+test('extension turned on during protected mode: turned off again, flagged, no reload of open tabs', () => {
+  const p = plan(input({ state: activeState(), tabs: [{ id: 1, url: 'https://bank.com/' }], loadTimes: { 1: 95_000 },
+    extensions: [ext('pw'), ext('ads'), off('grammar')] }));
+  assert.deepEqual(p.disable, ['ads']);
+  assert.deepEqual(p.intrusion, ['ads']);
+  assert.deepEqual(p.stamp, []);
+  assert.deepEqual(p.reloadTabIds, []);
+  assert.equal(p.nextState.disabledAt.ads, 90_000, 'the original disable time is kept');
+});
+
+test('detected tab: reloaded only if it loaded before extensions went off', () => {
+  const settings = normalizeSettings({ sites: [{ domain: 'bank.com' }], globalWhitelist: ['pw'], fieldDetection: true });
+  const tabs = [{ id: 1, url: 'https://bank.com/' }, { id: 2, url: 'https://shop.com/login' }, { id: 3, url: 'https://forum.com/login' }];
+  const p = plan(input({ settings, state: activeState(), tabs, flaggedTabs: { 2: 'shop.com', 3: 'forum.com' },
+    loadTimes: { 1: 95_000, 2: 95_000, 3: 80_000 }, extensions: [ext('pw'), off('ads'), off('grammar')] }));
+  assert.deepEqual(p.reloadTabIds, [3]);
+  assert.deepEqual(p.nextState.activeSites.sort(), ['bank.com', 'forum.com', 'shop.com']);
+});
+
+test('detected fields are ignored on excluded domains and when detection is off', () => {
+  const flaggedTabs = { 2: 'shop.com' };
+  const tabs = [{ id: 2, url: 'https://shop.com/login' }];
+  assert.equal(plan(input({ tabs, flaggedTabs })).badge.mode, 'off');
+  assert.equal(plan(input({ tabs, flaggedTabs, settings: normalizeSettings({ fieldDetection: true, detectionExclusions: ['shop.com'] }) })).badge.mode, 'off');
+  assert.equal(plan(input({ tabs, flaggedTabs, settings: normalizeSettings({ fieldDetection: true }) })).badge.mode, 'on');
+});
+
+test('audit fix: a protected site inside an iframe turns protection on, without reloading the page', () => {
+  const p = plan(input({ tabs: [{ id: 5, url: 'https://shop.com/checkout' }], framedTabs: { 5: ['acs.bank.com'] }, loadTimes: { 5: 1 } }));
+  assert.deepEqual(p.disable.sort(), ['ads', 'grammar']);
+  assert.deepEqual(p.nextState.activeSites, ['bank.com']);
+  assert.deepEqual(p.reloadTabIds, [], 'the checkout page itself is not reloaded');
 });
 
 test('leaving: wait for the grace period, then restore', () => {
@@ -62,17 +134,14 @@ test('leaving: wait for the grace period, then restore', () => {
   const waiting = plan(input({ state, tabs: [{ id: 1, url: 'https://news.com/' }] }));
   assert.deepEqual(waiting.enable, []);
   assert.equal(waiting.scheduleCheck, true);
-  assert.equal(waiting.nextState.inactiveSince, 100_000);
-
-  const later = plan(input({ now: 100_000 + GRACE, state: waiting.nextState, tabs: [{ id: 1, url: 'https://news.com/' }] }));
+  const later = plan(input({ now: NOW + GRACE, state: waiting.nextState, tabs: [{ id: 1, url: 'https://news.com/' }] }));
   assert.deepEqual(later.enable, ['ads']);
   assert.deepEqual(later.nextState.disabledByUs, []);
-  assert.equal(later.badge.mode, 'off');
+  assert.deepEqual(later.nextState.disabledAt, {});
 });
 
 test('restore skips extensions that were uninstalled meanwhile', () => {
-  const state = { ...DEFAULT_STATE, disabledByUs: ['ads', 'gone'], inactiveSince: 0 };
-  assert.deepEqual(plan(input({ state })).enable, ['ads']);
+  assert.deepEqual(plan(input({ state: { ...DEFAULT_STATE, disabledByUs: ['ads', 'gone'], inactiveSince: 0 } })).enable, ['ads']);
 });
 
 test('clipboard is cleared once, when protection ends', () => {
@@ -83,9 +152,8 @@ test('clipboard is cleared once, when protection ends', () => {
 });
 
 test('pause restores immediately and lifts itself once you leave', () => {
-  const state = { ...DEFAULT_STATE, disabledByUs: ['ads'], activeSites: ['bank.com'] };
-  const paused = plan(input({ state, paused: true, tabs: [{ id: 1, url: 'https://bank.com/' }] }));
-  assert.deepEqual(paused.enable, ['ads']);
+  const paused = plan(input({ state: activeState(), paused: true, tabs: [{ id: 1, url: 'https://bank.com/' }] }));
+  assert.deepEqual(paused.enable.sort(), ['ads', 'grammar']);
   assert.equal(paused.badge.mode, 'pause');
   assert.equal(paused.unpause, false);
   assert.equal(plan(input({ paused: true })).unpause, true);
@@ -101,74 +169,37 @@ test('several protected sites: only extensions allowed on all of them stay on', 
   assert.deepEqual([...computeAllowed(settings.sites, settings.globalWhitelist)].sort(), ['grammar', 'pw']);
 });
 
-test('extension turned on during protected mode: turned off again, flagged, no reload of open tabs', () => {
-  const state = {
-    ...DEFAULT_STATE, disabledByUs: ['ads'], activeSites: ['bank.com'], protectedTabIds: [1],
-    allowedIds: ['pw'], cleanSince: 90_000, seenSites: ['bank.com'],
-  };
-  const p = plan(input({ state, tabs: [{ id: 1, url: 'https://bank.com/' }], extensions: [ext('pw'), ext('ads'), ext('grammar', { enabled: false })] }));
-  assert.deepEqual(p.disable, ['ads']);
-  assert.deepEqual(p.intrusion, ['ads']);
-  assert.deepEqual(p.reloadTabIds, []);
-});
-
-test('a tab that becomes protected is only reloaded if it loaded before extensions went off', () => {
-  const settings = normalizeSettings({ sites: [{ domain: 'bank.com' }], globalWhitelist: ['pw'], fieldDetection: true });
-  const state = {
-    ...DEFAULT_STATE, disabledByUs: ['ads'], activeSites: ['bank.com'], protectedTabIds: [1],
-    allowedIds: ['pw'], cleanSince: 90_000, seenSites: ['bank.com'],
-  };
-  const tabs = [{ id: 1, url: 'https://bank.com/' }, { id: 2, url: 'https://shop.com/login' }, { id: 3, url: 'https://forum.com/login' }];
-  const flaggedTabs = { 2: 'shop.com', 3: 'forum.com' };
-  const loadTimes = { 2: 95_000, 3: 80_000 }; // 2 loaded after extensions went off, 3 before
-  const p = plan(input({ settings, state, tabs, flaggedTabs, loadTimes, extensions: [ext('pw'), ext('ads', { enabled: false })] }));
-  assert.deepEqual(p.reloadTabIds, [3]);
-  assert.deepEqual(p.nextState.activeSites.sort(), ['bank.com', 'forum.com', 'shop.com']);
-});
-
-test('detected fields are ignored on excluded domains and when detection is off', () => {
-  const flaggedTabs = { 2: 'shop.com' };
-  const tabs = [{ id: 2, url: 'https://shop.com/login' }];
-  const off = plan(input({ tabs, flaggedTabs }));
-  assert.equal(off.badge.mode, 'off');
-  const excluded = plan(input({ tabs, flaggedTabs, settings: normalizeSettings({ fieldDetection: true, detectionExclusions: ['shop.com'] }) }));
-  assert.equal(excluded.badge.mode, 'off');
-  const on = plan(input({ tabs, flaggedTabs, settings: normalizeSettings({ fieldDetection: true }) }));
-  assert.equal(on.badge.mode, 'on');
-});
-
-test('"log out when leaving" cleans up after the grace period, not before', () => {
+test('audit fix: "log out when leaving" cleans every visited subdomain, after the grace period', () => {
   const settings = normalizeSettings({ sites: [{ domain: 'bank.com', cleanup: true }, { domain: 'tax.gov' }] });
-  const state = { ...DEFAULT_STATE, activeSites: ['bank.com', 'tax.gov'], seenSites: ['bank.com', 'tax.gov'], disabledByUs: ['ads'] };
-  const tabs = [{ id: 2, url: 'https://tax.gov/' }];
-  const first = plan(input({ settings, state, tabs }));
-  assert.deepEqual(first.cleanup, []);
-  assert.equal(first.scheduleCheck, true);
-  const later = plan(input({ now: 100_000 + GRACE, settings, state: first.nextState, tabs }));
-  assert.deepEqual(later.cleanup, ['bank.com']);
-  const back = plan(input({ now: 100_001, settings, state: first.nextState, tabs: [...tabs, { id: 3, url: 'https://bank.com/' }] }));
+  const visiting = plan(input({ settings, tabs: [{ id: 1, url: 'https://online.bank.com/' }, { id: 2, url: 'https://tax.gov/' }] }));
+  assert.deepEqual(visiting.nextState.siteHosts, { 'bank.com': ['online.bank.com'] }, 'only sites with cleanup are tracked');
+  const left = plan(input({ settings, state: visiting.nextState, tabs: [{ id: 2, url: 'https://tax.gov/' }] }));
+  assert.deepEqual(left.cleanup, []);
+  assert.equal(left.scheduleCheck, true);
+  const later = plan(input({ now: NOW + GRACE, settings, state: left.nextState, tabs: [{ id: 2, url: 'https://tax.gov/' }] }));
+  assert.deepEqual(later.cleanup, [{ domain: 'bank.com', hosts: ['bank.com', 'online.bank.com', 'www.bank.com'] }]);
+  assert.deepEqual(later.nextState.siteHosts, {});
+  const back = plan(input({ now: NOW + 1, settings, state: left.nextState, tabs: [{ id: 2, url: 'https://tax.gov/' }, { id: 3, url: 'https://bank.com/' }] }));
   assert.deepEqual(back.cleanup, [], 'returning within the grace period cancels the cleanup');
 });
 
 test('the tab being closed is not counted', () => {
-  const state = { ...DEFAULT_STATE, disabledByUs: ['ads'], inactiveSince: 0 };
-  const p = plan(input({ state, tabs: [{ id: 1, url: 'https://bank.com/' }], excludeTabId: 1 }));
+  const p = plan(input({ state: { ...DEFAULT_STATE, disabledByUs: ['ads'], inactiveSince: 0 }, tabs: [{ id: 1, url: 'https://bank.com/' }], excludeTabId: 1 }));
   assert.deepEqual(p.enable, ['ads']);
-});
-
-test('removeFromAllowlists remembers where an extension was', () => {
-  const settings = normalizeSettings({ globalWhitelist: ['a'], sites: [{ domain: 'x.nl', extra: ['a', 'b'] }] });
-  const where = removeFromAllowlists(settings, 'a');
-  assert.deepEqual(where, { global: true, sites: ['x.nl'] });
-  assert.deepEqual(settings.globalWhitelist, []);
-  assert.deepEqual(settings.sites[0].extra, ['b']);
 });
 
 test('an unchanged situation produces an identical state (no needless writes)', () => {
   const tabs = [{ id: 1, url: 'https://bank.com/' }];
-  const first = plan(input({ tabs }));
-  const again = plan(input({ tabs, state: first.nextState, extensions: [ext('pw'), ext('ads', { enabled: false }), ext('grammar', { enabled: false })] }));
+  const first = plan(input({ tabs, loadTimes: { 1: NOW + 1 } }));
+  const again = plan(input({ tabs, state: first.nextState, loadTimes: { 1: NOW + 1 }, extensions: [ext('pw'), off('ads'), off('grammar')] }));
   assert.equal(JSON.stringify(again.nextState), JSON.stringify(first.nextState));
   const idle = plan(input());
   assert.equal(JSON.stringify(plan(input({ state: idle.nextState })).nextState), JSON.stringify(idle.nextState));
+});
+
+test('removeFromAllowlists remembers where an extension was', () => {
+  const settings = normalizeSettings({ globalWhitelist: ['a'], sites: [{ domain: 'x.nl', extra: ['a', 'b'] }] });
+  assert.deepEqual(removeFromAllowlists(settings, 'a'), { global: true, sites: ['x.nl'] });
+  assert.deepEqual(settings.globalWhitelist, []);
+  assert.deepEqual(settings.sites[0].extra, ['b']);
 });
