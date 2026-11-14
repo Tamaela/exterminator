@@ -20,7 +20,7 @@ test('migrates v1 data to the current schema', async () => {
   assert.equal(settings.fieldDetection, true);
   assert.equal('passwordDetection' in settings, false);
   assert.equal('paused' in settings, false);
-  assert.equal(settings.sites[0].cleanup, false);
+  assert.equal(settings.sites[0].level, 'site');
   assert.equal(await isPaused(), false, 'an old global pause is dropped');
   const state = await getState();
   assert.equal('autoSites' in state, false);
@@ -33,6 +33,23 @@ test('migrates v1 data to the current schema', async () => {
   assert.equal(await migrate(), false, 'running twice is a no-op');
 });
 
+test('v4 data: the cleanup flag and the login-only list become a level per site', async () => {
+  chrome.storage.local.reset({
+    schemaVersion: 4,
+    settings: { sites: [{ domain: 'bank.com', extra: ['pw'], cleanup: true }, { domain: 'mail.com', extra: [], cleanup: false }], loginOnly: ['forum.com', 'bank.com'] },
+  });
+  assert.equal(await migrate(), true);
+  const settings = await getSettings();
+  assert.deepEqual(settings.sites, [
+    { domain: 'bank.com', extra: ['pw'], level: 'strict' },
+    { domain: 'mail.com', extra: [], level: 'site' },
+    { domain: 'forum.com', extra: [], level: 'login' },
+  ]);
+  assert.equal('loginOnly' in settings, false);
+  const { settings: stored } = await chrome.storage.local.get('settings');
+  assert.equal('cleanup' in stored.sites[0], false);
+});
+
 test('actions update settings without duplicates', async () => {
   await actions.addSite('bank.com');
   await actions.addSite('bank.com');
@@ -42,7 +59,7 @@ test('actions update settings without duplicates', async () => {
   await actions.setAlwaysOn('pw', true);
   await actions.addExclusion('shop.com');
   const s = await getSettings();
-  assert.deepEqual(s.sites, [{ domain: 'bank.com', extra: ['grammar'], cleanup: true }]);
+  assert.deepEqual(s.sites, [{ domain: 'bank.com', extra: ['grammar'], level: 'strict' }]);
   assert.deepEqual(s.globalWhitelist, ['pw']);
   assert.deepEqual(s.detectionExclusions, ['shop.com']);
 
@@ -53,7 +70,7 @@ test('actions update settings without duplicates', async () => {
 test('new sites are strict unless another level is chosen', async () => {
   await actions.addSite('bank.com');
   await actions.addSite('forum.com', 'site');
-  assert.deepEqual((await getSettings()).sites.map((x) => [x.domain, x.cleanup]), [['bank.com', true], ['forum.com', false]]);
+  assert.deepEqual((await getSettings()).sites.map((x) => [x.domain, x.level]), [['bank.com', 'strict'], ['forum.com', 'site']]);
 });
 
 test('answering the question stores the level and closes the question', async () => {
@@ -63,8 +80,7 @@ test('answering the question stores the level and closes the question', async ()
   await actions.chooseLevel('social.com', 'site');
   await actions.chooseLevel('shop.com', 'never');
   const s = await getSettings();
-  assert.deepEqual(s.loginOnly, ['forum.com']);
-  assert.deepEqual(s.sites.map((x) => [x.domain, x.cleanup]), [['bank.com', true], ['social.com', false]]);
+  assert.deepEqual(s.sites.map((x) => [x.domain, x.level]), [['forum.com', 'login'], ['bank.com', 'strict'], ['social.com', 'site']]);
   assert.deepEqual(s.detectionExclusions, ['shop.com']);
   assert.deepEqual(Object.keys(await getAsks()), ['news.com']);
   assert.deepEqual(openAsks({ 'news.com': 1, 'login.social.com': 2 }, s), ['news.com'], 'a site that is already covered is not asked about');

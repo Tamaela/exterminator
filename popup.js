@@ -1,13 +1,13 @@
 import { t, localizePage } from './lib/i18n.js';
-import { suggestDomain, matchSite, findDomain } from './lib/domains.js';
-import { describeTab, siteForTab } from './lib/planner.js';
+import { suggestDomain, matchSite } from './lib/domains.js';
+import { describeTab, siteForTab, wholeSites } from './lib/planner.js';
 import { riskOf, permissionSnapshot } from './lib/risk.js';
 import {
   KEYS, getSettings, getState, isPaused, setPaused, pauseFor, getAlerts, getFlaggedTabs, getFramedTabs, actions,
-  getAsks, levelOf,
+  getAsks,
 } from './lib/storage.js';
 import { el, readDomain, onStorageChange } from './lib/ui.js';
-import { levelPicker, askCards } from './lib/levels.js';
+import { levelPicker, askCards, levelsFor } from './lib/levels.js';
 
 localizePage();
 
@@ -50,9 +50,14 @@ function renderSite(settings, flaggedTabs) {
   siteEl.append(el('p', { className: 'host', textContent: host }));
 
   if (site) {
+    const status = site.level !== 'login'
+      ? el('p', { className: 'ok', textContent: site.domain === host ? t('protectedSite') : t('protectedVia', { domain: site.domain }) })
+      : detected
+        ? el('p', { className: 'ok', textContent: t('detectedProtected') })
+        : el('p', { className: 'muted', textContent: t('loginOnlyStatus') });
     siteEl.append(
-      el('p', { className: 'ok', textContent: site.domain === host ? t('protectedSite') : t('protectedVia', { domain: site.domain }) }),
-      levelPicker('level', levelOf(site), ['site', 'strict'], (level) => actions.setSiteLevel(site.domain, level)),
+      status,
+      levelPicker('level', site.level, levelsFor(settings, site.level), (level) => actions.setSiteLevel(site.domain, level)),
       el('button', { className: 'danger', textContent: t('removeProtection'), onclick: () => actions.removeSite(site.domain) }),
     );
     return;
@@ -69,13 +74,9 @@ function renderSite(settings, flaggedTabs) {
       el('button', { className: 'secondary', textContent: t('neverAutoProtect'), onclick: () => actions.addExclusion(suggestDomain(host)) }),
     );
   }
-  const loginOnly = settings.fieldDetection && findDomain(host, settings.loginOnly);
-  if (loginOnly) siteEl.append(el('p', { className: 'muted', textContent: t('loginOnlyStatus', { domain: loginOnly }) }));
 
   const input = el('input', { type: 'text', value: suggestDomain(host), spellcheck: false });
   const error = el('p', { className: 'error', hidden: true });
-  // "Login pages only" depends on automatic protection, so it is offered only when that is on.
-  const levels = settings.fieldDetection && !loginOnly ? ['login', 'site', 'strict'] : ['site', 'strict'];
   let level = 'strict';
   const add = () => {
     const domain = readDomain(input, error);
@@ -85,7 +86,7 @@ function renderSite(settings, flaggedTabs) {
   siteEl.append(
     el('label', { className: 'field' }, el('span', { textContent: t('domainLabel') }), input),
     error,
-    levelPicker('new-level', level, levels, (chosen) => { level = chosen; }),
+    levelPicker('new-level', level, levelsFor(settings, level), (chosen) => { level = chosen; }),
     el('button', { textContent: t('protectThisSite'), onclick: add }),
   );
 }
@@ -115,7 +116,7 @@ async function goToSite(domain) {
   ]);
   const own = tabs.filter((x) => siteForTab(x.url, x.id, settings, flagged)?.domain === domain);
   const viaFrame = tabs.filter((x) => !own.includes(x)
-    && (framed[x.id] || []).some((host) => matchSite(host, settings.sites)?.domain === domain));
+    && (framed[x.id] || []).some((host) => matchSite(host, wholeSites(settings))?.domain === domain));
   const candidates = [...own, ...viaFrame];
   if (!candidates.length) return;
   const current = candidates.findIndex((x) => x.id === tab?.id);

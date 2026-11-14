@@ -1,6 +1,6 @@
 import { t } from './lib/i18n.js';
 import { hostOf, matchSite, suggestDomain } from './lib/domains.js';
-import { plan, siteForTab, describeTab, allowlistedIds } from './lib/planner.js';
+import { plan, siteForTab, describeTab, allowlistedIds, wholeSites } from './lib/planner.js';
 import { describePermission, permissionSnapshot } from './lib/risk.js';
 import { DETECTOR_ORIGINS, detectorFiles } from './lib/detection.js';
 import {
@@ -184,7 +184,8 @@ async function flagTab(tab, reused) {
   flaggedPages.set(tab.id, withoutHash(tab.url));
   const again = recheckedTabs.get(tab.id) === host;
   recheckedTabs.delete(tab.id);
-  if (!site && !again) await addLog({ type: 'detected', site: host });
+  if (site && site.level !== 'login') return true; // protected as a whole: nothing to log or ask
+  if (!again) await addLog({ type: 'detected', site: host });
   if (!site) await askLevel(suggestDomain(host), settings);
   return true;
 }
@@ -321,7 +322,7 @@ async function protectedFrameHosts(tabId) {
   } catch {
     return [];
   }
-  const { sites } = await getSettings();
+  const sites = wholeSites(await getSettings());
   const found = new Set();
   for (const frame of frames || []) {
     if (frame.parentFrameId === -1) continue; // a main frame
@@ -624,7 +625,7 @@ async function reloadAllProtectedTabs() {
   ]);
   for (const tab of tabs) {
     if (!/^https?:/i.test(tab.url || '')) continue; // about:blank or blob: pages would be lost
-    const viaFrame = (framed[tab.id] || []).some((host) => matchSite(host, settings.sites));
+    const viaFrame = (framed[tab.id] || []).some((host) => matchSite(host, wholeSites(settings)));
     if (viaFrame || siteForTab(tab.url, tab.id, settings, flagged)) await reloadTab(tab.id);
   }
 }
@@ -661,7 +662,7 @@ const isPrerender = (d) => d.documentLifecycle === 'prerender';
 // Everything else is a sub-frame, fenced frames included.
 const isSubFrame = (d) => (d.frameType ? d.frameType !== 'outermost_frame' : d.frameId !== 0);
 async function isProtectedHost(url) {
-  return !!matchSite(hostOf(url), (await getSettings()).sites);
+  return !!matchSite(hostOf(url), wholeSites(await getSettings()));
 }
 
 // As early as possible: before the page loads.

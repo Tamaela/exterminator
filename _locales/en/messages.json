@@ -291,7 +291,7 @@
     "message": "Protected sites"
   },
   "sitesIntro": {
-    "message": "On these sites (and their subdomains) all extensions are turned off, except the allowed ones. Protected mode stays active as long as a tab of a protected site is open anywhere. New sites are Strict unless you choose Whole site."
+    "message": "On these sites (and their subdomains) all extensions are turned off, except the allowed ones. The level decides when: on pages with a sensitive field, or while a tab of the site is open. New sites are Strict unless you choose another level."
   },
   "domainPlaceholder": {
     "message": "e.g. mybank.com"
@@ -507,7 +507,7 @@
     "message": "Sure? Extensions stay on here"
   },
   "levelLoginWarning": {
-    "message": "After you leave the page with the field, extensions can read the rest of this site and act in your login session."
+    "message": "After you leave the page with the field, extensions can read the rest of this site and act in your login session. This level needs automatic protection."
   },
   "levelSiteWarning": {
     "message": "After you leave this site, extensions can use your login session."
@@ -530,20 +530,8 @@
   "badgeAskTitle": {
     "message": "Exterminator: choose how to protect a site"
   },
-  "loginOnlyLabel": {
-    "message": "Login pages only"
-  },
-  "loginOnlyHelp": {
-    "message": "You chose Login pages only for these sites. Exterminator does not ask about them again."
-  },
   "loginOnlyStatus": {
-    "message": "Level for {domain}: Login pages only"
-  },
-  "noLoginOnly": {
-    "message": "No sites."
-  },
-  "askAgain": {
-    "message": "Ask again"
+    "message": "Protected only on pages with a password, code or payment field."
   },
   "popupReload": {
     "message": "Version {version} is on disk but not loaded. Reload Exterminator in chrome://extensions."

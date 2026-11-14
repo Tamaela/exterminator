@@ -30,7 +30,7 @@ test('choosing a level in the question adds the site', async () => {
   const card = askCard('bank.com');
   card.querySelector('button.level-choice').click(); // the first choice is Strict
   await settle();
-  assert.deepEqual((await getSettings()).sites, [{ domain: 'bank.com', extra: [], cleanup: true }]);
+  assert.deepEqual((await getSettings()).sites, [{ domain: 'bank.com', extra: [], level: 'strict' }]);
 });
 
 test('the level picker shows the warning of the chosen level', () => {

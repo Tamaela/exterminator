@@ -122,6 +122,17 @@ test('detected fields are ignored on excluded domains and when detection is off'
   assert.equal(plan(input({ tabs, flaggedTabs, settings: normalizeSettings({ fieldDetection: true }) })).badge.mode, 'on');
 });
 
+test('a "login" site is protected only on a page with a detected field, with its own extras', () => {
+  const settings = normalizeSettings({ sites: [{ domain: 'forum.com', level: 'login', extra: ['grammar'] }], globalWhitelist: ['pw'], fieldDetection: true });
+  const tabs = [{ id: 1, url: 'https://forum.com/topic' }];
+  assert.equal(plan(input({ settings, tabs })).badge.mode, 'off', 'no field: extensions stay on');
+  const flagged = plan(input({ settings, tabs, flaggedTabs: { 1: 'forum.com' } }));
+  assert.deepEqual(flagged.nextState.activeSites, ['forum.com']);
+  assert.deepEqual(flagged.disable, ['ads'], 'its extras stay on');
+  const framed = plan(input({ settings, tabs: [{ id: 2, url: 'https://shop.com/' }], framedTabs: { 2: ['forum.com'] } }));
+  assert.equal(framed.badge.mode, 'off', 'a "login" site in a frame does not count');
+});
+
 test('a protected site inside an iframe turns protection on, without reloading the page', () => {
   const p = plan(input({ tabs: [{ id: 5, url: 'https://shop.com/checkout' }], framedTabs: { 5: ['acs.bank.com'] }, loadTimes: { 5: 1 } }));
   assert.deepEqual(p.disable.sort(), ['ads', 'grammar']);
@@ -204,7 +215,7 @@ test('an about:blank popup of a protected page and a blob: page count as protect
 });
 
 test('cleanup says when a site was visited in incognito', () => {
-  const settings = normalizeSettings({ sites: [{ domain: 'bank.com', cleanup: true }] });
+  const settings = normalizeSettings({ sites: [{ domain: 'bank.com', level: 'strict' }] });
   const visiting = plan(input({ settings, tabs: [{ id: 1, url: 'https://bank.com/', incognito: true }] }));
   assert.deepEqual(visiting.nextState.incognitoSites, ['bank.com']);
   const left = plan(input({ settings, state: visiting.nextState }));
@@ -224,7 +235,7 @@ test('several protected sites: only extensions allowed on all of them stay on', 
 });
 
 test('"log out when leaving" cleans every visited subdomain, after the grace period', () => {
-  const settings = normalizeSettings({ sites: [{ domain: 'bank.com', cleanup: true }, { domain: 'tax.gov' }] });
+  const settings = normalizeSettings({ sites: [{ domain: 'bank.com', level: 'strict' }, { domain: 'tax.gov' }] });
   const visiting = plan(input({ settings, tabs: [{ id: 1, url: 'https://online.bank.com/' }, { id: 2, url: 'https://tax.gov/' }] }));
   assert.deepEqual(visiting.nextState.siteHosts, { 'bank.com': ['online.bank.com'] }, 'only sites with cleanup are tracked');
   const left = plan(input({ settings, state: visiting.nextState, tabs: [{ id: 2, url: 'https://tax.gov/' }] }));
@@ -261,7 +272,7 @@ test('removeFromAllowlists remembers where an extension was', () => {
 });
 
 test('a site that was only framed or prerendered is never logged out', () => {
-  const settings = normalizeSettings({ sites: [{ domain: 'bank.com', cleanup: true }] });
+  const settings = normalizeSettings({ sites: [{ domain: 'bank.com', level: 'strict' }] });
   const framed = plan(input({ settings, frameUrls: ['https://bank.com/'], tabs: [{ id: 1, url: 'https://evil.com/' }], framedTabs: { 1: ['bank.com'] } }));
   assert.deepEqual(framed.nextState.seenSites, []);
   assert.deepEqual(framed.nextState.siteHosts, {});
@@ -271,7 +282,7 @@ test('a site that was only framed or prerendered is never logged out', () => {
 });
 
 test('a visited site stays "seen" while it is still open in an iframe', () => {
-  const settings = normalizeSettings({ sites: [{ domain: 'bank.com', cleanup: true }] });
+  const settings = normalizeSettings({ sites: [{ domain: 'bank.com', level: 'strict' }] });
   const visit = plan(input({ settings, tabs: [{ id: 1, url: 'https://bank.com/' }] }));
   const framed = plan(input({ settings, state: visit.nextState, tabs: [{ id: 1, url: 'https://shop.com/' }], framedTabs: { 1: ['acs.bank.com'] } }));
   assert.deepEqual(framed.nextState.seenSites, ['bank.com']);
@@ -282,7 +293,7 @@ test('a visited site stays "seen" while it is still open in an iframe', () => {
 });
 
 test('extensions allowed on the remaining site wait for the left site to be logged out', () => {
-  const settings = normalizeSettings({ sites: [{ domain: 'bank.com', cleanup: true }, { domain: 'tax.gov', extra: ['ads'] }], globalWhitelist: ['pw'], clearClipboard: true });
+  const settings = normalizeSettings({ sites: [{ domain: 'bank.com', level: 'strict' }, { domain: 'tax.gov', extra: ['ads'] }], globalWhitelist: ['pw'], clearClipboard: true });
   const both = plan(input({ settings, tabs: [{ id: 1, url: 'https://bank.com/' }, { id: 2, url: 'https://tax.gov/' }] }));
   assert.deepEqual(both.disable.sort(), ['ads', 'grammar']);
   const exts = [ext('pw'), off('ads'), off('grammar')];

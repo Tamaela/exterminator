@@ -1,10 +1,10 @@
 import { t, localizePage } from './lib/i18n.js';
 import { riskOf, describePermission, canManageExtensions, sortByRisk, permissionSnapshot } from './lib/risk.js';
 import {
-  KEYS, getSettings, getAlerts, getLog, clearLog, logText, actions, getAsks, levelOf,
+  KEYS, getSettings, getAlerts, getLog, clearLog, logText, actions, getAsks,
 } from './lib/storage.js';
 import { el, readDomain, onStorageChange } from './lib/ui.js';
-import { levelPicker, askCards } from './lib/levels.js';
+import { levelPicker, askCards, levelsFor } from './lib/levels.js';
 import { DETECTOR_ORIGINS } from './lib/detection.js';
 
 localizePage();
@@ -111,15 +111,6 @@ function renderExclusions(settings) {
     : [el('li', { className: 'muted', textContent: t('noExceptions') })]));
 }
 
-function renderLoginOnly(settings) {
-  const list = [...settings.loginOnly].sort();
-  $('login-only').replaceChildren(...(list.length
-    ? list.map((domain) => el('li', {},
-      el('span', { className: 'domain', textContent: domain }),
-      el('button', { className: 'secondary small', textContent: t('askAgain'), onclick: () => actions.removeLoginOnly(domain) })))
-    : [el('li', { className: 'muted', textContent: t('noLoginOnly') })]));
-}
-
 function renderAsks(asks, settings) {
   $('asks').replaceChildren(...askCards(asks, settings));
   $('asks-card').hidden = !$('asks').childElementCount;
@@ -151,7 +142,7 @@ function renderSites(settings, exts) {
       el('div', { className: 'site-head' },
         el('span', { className: 'domain', textContent: site.domain }),
         el('button', { className: 'danger', textContent: t('remove'), onclick: () => actions.removeSite(site.domain) })),
-      levelPicker(`level-${site.domain}`, levelOf(site), ['site', 'strict'], (level) => actions.setSiteLevel(site.domain, level)),
+      levelPicker(`level-${site.domain}`, site.level, levelsFor(settings, site.level), (level) => actions.setSiteLevel(site.domain, level)),
       details);
   }) : [el('p', { className: 'muted', textContent: t('noSites') })]));
 }
@@ -166,7 +157,6 @@ async function render() {
   renderAlerts(alerts);
   renderLog(log);
   renderExclusions(settings);
-  renderLoginOnly(settings);
   renderAsks(asks, settings);
   renderSites(settings, exts);
 
