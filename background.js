@@ -158,7 +158,15 @@ async function injectDetector(js) {
     .catch(() => {}))); // e.g. an error page, the Web Store, or a tab that doesn't respond
 }
 
-// A tab with a sensitive field stays protected for as long as it stays on that host.
+// Tabs whose flag was dropped because they showed another page, with the host they had.
+// When the new page reports a field on that same host, the activity log gets no new entry.
+// Kept in memory only: after a service worker restart, the worst case is one extra log entry.
+const recheckedTabs = new Map();
+// The address (without #fragment) each flagged tab had when it was flagged, also in memory only.
+const flaggedPages = new Map();
+const withoutHash = (url) => String(url || '').split('#')[0];
+
+// A tab with a sensitive field stays protected for as long as it shows that page.
 // `reused`: the document came back from the back/forward cache or a prerender, so it may
 // hold scripts of extensions that were on at the time; forget its load time to force a reload.
 async function flagTab(tab, reused) {
@@ -175,16 +183,48 @@ async function flagTab(tab, reused) {
   }
   flagged[tab.id] = host;
   await setFlaggedTabs(flagged);
-  if (!site) await addLog({ type: 'detected', site: host });
+  flaggedPages.set(tab.id, withoutHash(tab.url));
+  const again = recheckedTabs.get(tab.id) === host;
+  recheckedTabs.delete(tab.id);
+  if (!site && !again) await addLog({ type: 'detected', site: host });
+  return true;
+}
+
+// The tab shows another page: drop its flag. The detector of the new page flags it again if
+// that page also has a sensitive field. The grace period keeps extensions off in the meantime.
+async function unflagTab(tabId, flagged) {
+  recheckedTabs.set(tabId, flagged[tabId]);
+  flaggedPages.delete(tabId);
+  delete flagged[tabId];
+  await setFlaggedTabs(flagged);
+}
+
+// A page that changed its address without loading a new document (a single-page app).
+// Its detector already reported once, so ask it to scan again.
+async function recheckTab(tabId) {
+  const flagged = await getFlaggedTabs();
+  if (!(tabId in flagged)) return false;
+  await unflagTab(tabId, flagged);
+  const settings = await getSettings();
+  const js = settings.sensitiveFields ? ['detector-extended.js', 'detector.js'] : ['detector.js'];
+  // Not awaited, like injectDetector: a tab that doesn't respond must not hold up the queue.
+  withTimeout(chrome.scripting.executeScript({ target: { tabId, allFrames: true }, files: js }), 5000, 'recheck')
+    .catch(() => {});
   return true;
 }
 
 // A new top-level document (newUrl) or a closed tab (no newUrl).
 async function forgetTab(tabId, newUrl) {
   const flagged = await getFlaggedTabs();
-  if (tabId in flagged && (newUrl === undefined || hostOf(newUrl) !== flagged[tabId])) {
-    delete flagged[tabId];
-    await setFlaggedTabs(flagged);
+  if (tabId in flagged) {
+    if (newUrl === undefined) {
+      delete flagged[tabId];
+      recheckedTabs.delete(tabId);
+      flaggedPages.delete(tabId);
+      await setFlaggedTabs(flagged);
+    } else {
+      await unflagTab(tabId, flagged);
+    }
   }
   for (const [get, set] of [[getFramedTabs, setFramedTabs], [getPrerenderTabs, setPrerenderTabs]]) {
     const map = await get();
@@ -656,6 +696,16 @@ chrome.webNavigation.onCommitted.addListener((d) => {
       if (await isProtectedHost(d.url)) await protectFrame(d);
     });
   }
+});
+
+// A single-page app showed another page (pushState). A change of only the #fragment, or a
+// replaceState to the same address, is not another page.
+chrome.webNavigation.onHistoryStateUpdated.addListener((d) => {
+  if (!isMainFrame(d) || isPrerender(d)) return;
+  if (flaggedPages.get(d.tabId) === withoutHash(d.url)) return;
+  run(async () => {
+    if (await recheckTab(d.tabId)) await protect();
+  });
 });
 
 // Fallback for URL changes without a (main-frame) navigation event, e.g. prerender activation.

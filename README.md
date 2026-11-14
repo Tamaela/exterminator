@@ -8,7 +8,7 @@ An extension can read everything on the pages it runs on. That includes password
 
 - You add a protected site from the toolbar icon or the settings page. Subdomains are protected too. Protected mode stays active while any tab of a protected site is open.
 - Extensions on the "Always on" list stay on everywhere. Use it for your password manager. Each site can allow extra extensions. With several protected sites open, an extra extension stays on only if every open site allows it. Newly installed extensions are off by default.
-- Automatic protection is optional. It protects any page with a password field. The field may be hidden or inside open or closed Shadow DOM. A second option adds credit card, CVC, 2FA, IBAN and national ID fields. You can exclude sites from automatic protection.
+- Automatic protection is optional. It protects any page with a password field. The field may be hidden or inside open or closed Shadow DOM. A second option adds credit card, CVC, 2FA, IBAN and national ID fields. This protection lasts while the tab shows that page. When you go to another page without such a field, the extensions come back after 3 seconds. You can exclude sites from automatic protection.
 - Exterminator checks the permissions of every allowed extension. An extension that gains new permissions in an update is removed from the lists until you approve it again.
 - Each extension gets a high, medium or low risk label based on its permissions.
 - An extension that is turned on during protected mode is turned off again. You get a notification with a button that reloads the protected tabs.
