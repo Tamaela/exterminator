@@ -35,6 +35,7 @@
   let sensitive = globalThis.__exterminatorExtended === true;
   // Content scripts can open closed shadow roots too; other extensions can, so we must look.
   const openOrClosed = globalThis.chrome?.dom?.openOrClosedShadowRoot;
+  // The shadow root of an element, open or closed.
   const shadowOf = (el) => {
     if (el.shadowRoot) return el.shadowRoot;
     try {
@@ -45,6 +46,7 @@
   };
   // Text fields shown as dots via CSS (-webkit-text-security), e.g. PIN fields.
   const MASKABLE = 'input:not([type]), input[type="text" i], input[type="tel" i], input[type="number" i]';
+  // True when a text field hides its characters with CSS, like a password field.
   const isMasked = (input) => {
     try {
       const style = getComputedStyle(input);
@@ -61,6 +63,7 @@
   let reused = false;
   let watchedRoots = new WeakSet();
 
+  // True for a password field, or in extended mode for card, code, IBAN and ID fields.
   function isSensitiveInput(input) {
     if (input.type?.toLowerCase() === 'password') return true;
     if (input.matches(MASKABLE) && isMasked(input)) return true;
@@ -70,6 +73,7 @@
     return SENSITIVE_NAME.test(`${input.name || ''} ${input.id || ''}`);
   }
 
+  // Tells the background worker once that this page has a sensitive field.
   function report() {
     found = true;
     // A prerendered page is not visible yet and belongs to no tab the user sees: wait.
@@ -83,6 +87,7 @@
     }
   }
 
+  // Watches a shadow root for new fields.
   function watch(shadowRoot) {
     if (watchedRoots.has(shadowRoot)) return;
     watchedRoots.add(shadowRoot);
@@ -111,6 +116,7 @@
     return false;
   }
 
+  // Scans the whole document, unless a field was already reported.
   function fullScan() {
     if (!reported && (found || scan(document))) report();
   }
@@ -129,6 +135,7 @@
   });
   observer.observe(document, OBSERVE);
 
+  // Forgets the earlier report and scans again.
   function restart() {
     reported = false;
     found = false;

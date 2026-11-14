@@ -5,6 +5,7 @@
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg?.target !== 'offscreen' || msg.type !== 'clear-clipboard') return;
   if (sender.id !== chrome.runtime.id || sender.tab) return; // only our own service worker
+  // Puts an empty string on the clipboard during the copy command.
   const onCopy = (e) => {
     e.clipboardData.setData('text/plain', '');
     e.preventDefault();

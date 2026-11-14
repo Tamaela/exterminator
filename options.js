@@ -21,6 +21,7 @@ try {
 }
 $('sort').value = sortMode;
 
+// Sorts by the chosen order: risk, reverse risk or name.
 function sortExtensions(exts) {
   if (sortMode === 'name') return [...exts].sort((a, b) => a.name.localeCompare(b.name));
   return sortByRisk(exts, sortMode === 'risk-asc' ? -1 : 1);
@@ -29,6 +30,7 @@ function sortExtensions(exts) {
 // Remember which <details> are open between renders.
 const openDetails = new Set();
 
+// A small high, medium or low label.
 function riskBadge(risk) {
   return el('span', {
     className: `risk risk-${risk.level}`,
@@ -87,8 +89,10 @@ function extList(exts, { isChecked, onToggle, lock }) {
   });
 }
 
+// Extensions your administrator forces on cannot be turned off.
 const policyLock = (ext) => (!ext.mayDisable ? { checked: true, note: t('managedByPolicy') } : null);
 
+// Extensions that gained permissions and wait for your review.
 function renderAlerts(alerts) {
   $('alerts-card').hidden = !alerts.length;
   $('alerts').replaceChildren(...alerts.map((a) => el('li', {},
@@ -102,6 +106,7 @@ function renderAlerts(alerts) {
       el('button', { className: 'secondary small', textContent: t('dismiss'), onclick: () => actions.dismissAlert(a.id) })))));
 }
 
+// Sites where automatic protection never triggers.
 function renderExclusions(settings) {
   const list = [...settings.detectionExclusions].sort();
   $('exclusions').replaceChildren(...(list.length
@@ -111,11 +116,13 @@ function renderExclusions(settings) {
     : [el('li', { className: 'muted', textContent: t('noExceptions') })]));
 }
 
+// Questions about detected sites that still wait for a level.
 function renderAsks(asks, settings) {
   $('asks').replaceChildren(...askCards(asks, settings));
   $('asks-card').hidden = !$('asks').childElementCount;
 }
 
+// The newest activity log entries.
 function renderLog(log) {
   $('log').replaceChildren(...(log.length
     ? log.slice(0, 100).map((entry) => el('li', { className: entry.type === 'error' ? 'error' : '' },
@@ -124,6 +131,7 @@ function renderLog(log) {
     : [el('li', { className: 'muted', textContent: t('logEmpty') })]));
 }
 
+// The protected sites with their level and extra extensions.
 function renderSites(settings, exts) {
   const globalSet = new Set(settings.globalWhitelist);
   const sites = [...settings.sites].sort((a, b) => a.domain.localeCompare(b.domain));
@@ -147,6 +155,7 @@ function renderSites(settings, exts) {
   }) : [el('p', { className: 'muted', textContent: t('noSites') })]));
 }
 
+// Draws the whole settings page from storage.
 async function render() {
   const [settings, all, alerts, log, incognitoAllowed, asks] = await Promise.all([
     getSettings(), chrome.management.getAll(), getAlerts(), getLog(), chrome.extension.isAllowedIncognitoAccess(), getAsks(),
@@ -246,6 +255,7 @@ $('sort').addEventListener('change', (e) => {
 });
 
 onStorageChange([KEYS.settings, KEYS.alerts, KEYS.log, KEYS.asks], render);
+// Redraw when extensions are installed, removed, turned on or off.
 for (const event of ['onInstalled', 'onUninstalled', 'onEnabled', 'onDisabled']) chrome.management[event].addListener(render);
 
 render();

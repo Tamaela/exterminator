@@ -39,6 +39,7 @@ function withTimeout(promise, ms, what) {
 // after TASK_TIMEOUT_MS so the tasks behind it (turning extensions off) still run.
 const TASK_TIMEOUT_MS = 15000;
 let queue = Promise.resolve();
+// Queues a task behind all earlier ones.
 function run(task) {
   queue = queue
     .then(() => withTimeout(Promise.resolve().then(task), TASK_TIMEOUT_MS, 'task'))
@@ -48,6 +49,7 @@ function run(task) {
 
 // Many events fire per navigation; coalesce plain checks into one queued run.
 let checkQueued = false;
+// Asks for one check; repeated requests before it runs are merged.
 function requestCheck() {
   if (checkQueued) return;
   checkQueued = true;
@@ -57,6 +59,7 @@ function requestCheck() {
   });
 }
 
+// Writes an error to the console and the activity log.
 async function logError(contextKey, params, err) {
   const message = err?.message || String(err);
   console.warn('[Exterminator]', contextKey, params, err);
@@ -67,6 +70,7 @@ async function logError(contextKey, params, err) {
   }
 }
 
+// Shows a Chrome notification; a failure is logged, never thrown.
 async function notify(id, options) {
   try {
     await withTimeout(chrome.notifications.create(id, { type: 'basic', iconUrl: 'icons/icon128.png', priority: 2, ...options }), 3000, 'notification');
@@ -79,12 +83,14 @@ async function notify(id, options) {
 
 // Our own re-enabling fires management.onEnabled; ignore those echoes.
 const expectedEnables = new Map();
+// True when this onEnabled event comes from our own setEnabled call.
 function isEcho(id) {
   const expiry = expectedEnables.get(id);
   expectedEnables.delete(id);
   return expiry !== undefined && expiry > Date.now();
 }
 
+// Turns one extension on or off. Returns false when Chrome refused.
 async function setEnabled(id, enabled, name) {
   if (enabled) expectedEnables.set(id, Date.now() + 5000);
   try {
@@ -103,6 +109,7 @@ async function setEnabled(id, enabled, name) {
 // the settings in storage.local.
 let storageRestricted = false;
 
+// Warns once per session that field detection stays off (see restrictStorage).
 async function warnStorageUnrestricted() {
   const { [KEYS.storageWarned]: warned } = await chrome.storage.session.get(KEYS.storageWarned);
   if (warned) return;
@@ -195,6 +202,7 @@ async function protectedFrameHosts(tabId) {
 // --- Monitoring "Always on" extensions --------------------------------------------------------
 
 const snapshot = permissionSnapshot;
+// Compares two plain values.
 const sameJson = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 
 /**
@@ -287,6 +295,7 @@ async function cleanupSite({ domain, hosts, incognito }) {
   if (incognito) await addLog({ type: 'cleanupIncognito', site: domain });
 }
 
+// Empties the clipboard through the offscreen document (service workers have no clipboard).
 async function clearClipboard() {
   try {
     const contexts = await chrome.runtime.getContexts({ contextTypes: ['OFFSCREEN_DOCUMENT'] });
@@ -311,6 +320,7 @@ async function clearClipboard() {
 // --- Evaluate & apply ------------------------------------------------------------------------
 
 let checkTimer = null;
+// Runs a check after the grace period, with an alarm as backup if the worker stops.
 function scheduleCheck() {
   if (checkTimer) return;
   checkTimer = setTimeout(() => {
@@ -319,6 +329,7 @@ function scheduleCheck() {
   }, GRACE_MS + 100);
   chrome.alarms.create(CHECK_ALARM, { delayInMinutes: 0.5 }); // safety net if the worker stops
 }
+// Cancels a scheduled check.
 function cancelCheck() {
   if (checkTimer) {
     clearTimeout(checkTimer);
@@ -328,6 +339,7 @@ function cancelCheck() {
 }
 
 let lastBadge = null;
+// Updates the toolbar badge and tooltip, only when they change.
 async function setBadge({ mode, count, ask }) {
   if (ask && mode !== 'pause') mode = 'ask';
   const key = `${mode}:${count}`;
@@ -346,6 +358,7 @@ async function setBadge({ mode, count, ask }) {
 }
 
 let fastAudit = null;
+// Checks permissions every minute while protection is active.
 async function syncFastAudit(active) {
   if (fastAudit === active) return;
   fastAudit = active;
@@ -356,6 +369,7 @@ async function syncFastAudit(active) {
 // restarting clears what we know about open tabs (detected fields, frames).
 let updatePending = false;
 
+// Collects the current situation, asks the planner what to do and does it.
 async function evaluate(opts = {}) {
   // Before you agree on the welcome page, nothing is turned off (Chrome Web Store policy:
   // changes to your setup need your knowledge and consent).
@@ -449,6 +463,7 @@ async function evaluate(opts = {}) {
   return { ...p, state: nextState, settings };
 }
 
+// Reloads a tab, or loads `url` in it. Errors are logged.
 async function reloadTab(tabId, url) {
   try {
     await withTimeout(url ? chrome.tabs.update(tabId, { url }) : chrome.tabs.reload(tabId), 5000, 'reload');
@@ -457,6 +472,7 @@ async function reloadTab(tabId, url) {
   }
 }
 
+// Evaluates and then reloads the tabs the plan names.
 async function protect(opts = {}) {
   const p = await evaluate(opts);
   if (p.restartNavigation) await reloadTab(p.restartNavigation.tabId, p.restartNavigation.url);
@@ -502,11 +518,13 @@ async function protectFrame(d) {
 // Main frames are identified by frameType when Chrome provides it: prerendered pages have
 // a main frame with a non-zero frameId.
 const isMainFrame = (d) => (d.frameType ? d.frameType === 'outermost_frame' : d.frameId === 0);
+// A navigation in a prerendered page that is not visible yet.
 const isPrerender = (d) => d.documentLifecycle === 'prerender';
 // Read from storage on every frame event: an in-memory cache would be empty right after the
 // service worker wakes up, which is exactly when the first frame event arrives.
 // Everything else is a sub-frame, fenced frames included.
 const isSubFrame = (d) => (d.frameType ? d.frameType !== 'outermost_frame' : d.frameId !== 0);
+// True when the URL belongs to a whole-site protected site.
 async function isProtectedHost(url) {
   return !!matchSite(hostOf(url), wholeSites(await getSettings()));
 }
@@ -528,6 +546,7 @@ chrome.webNavigation.onBeforeNavigate.addListener((d) => {
   }
 });
 
+// A protected page opened a popup or a new tab.
 chrome.webNavigation.onCreatedNavigationTarget.addListener((d) => {
   run(async () => {
     await recordOpener(d);
@@ -535,6 +554,7 @@ chrome.webNavigation.onCreatedNavigationTarget.addListener((d) => {
   });
 });
 
+// A page or frame has loaded its new document.
 chrome.webNavigation.onCommitted.addListener((d) => {
   if (isMainFrame(d) && isPrerender(d)) {
     // The prerender may have been redirected into a protected site after onBeforeNavigate.
@@ -577,6 +597,7 @@ chrome.tabs.onUpdated.addListener((_tabId, info) => {
   if (info.url) requestCheck();
 });
 
+// A closed tab: forget it and check again without it.
 chrome.tabs.onRemoved.addListener((tabId) => {
   run(async () => {
     await forgetTab(tabId);
@@ -584,6 +605,7 @@ chrome.tabs.onRemoved.addListener((tabId) => {
   });
 });
 
+// Chrome swapped a tab for another one.
 chrome.tabs.onReplaced.addListener((added, removed) => {
   run(async () => {
     await replaceTab(added, removed);
@@ -591,6 +613,7 @@ chrome.tabs.onReplaced.addListener((added, removed) => {
   });
 });
 
+// The detector found a sensitive field.
 chrome.runtime.onMessage.addListener((msg, sender) => {
   if (msg?.type !== 'sensitive-field' || !sender.tab) return;
   // Only the document the tab currently shows (not a prerender or a cached page) can flag it,
@@ -606,11 +629,13 @@ chrome.runtime.onMessage.addListener((msg, sender) => {
 chrome.management.onInstalled.addListener((ext) => {
   if (ext.id !== chrome.runtime.id) requestCheck();
 });
+// An extension was turned on: during protection it may need to go off again.
 chrome.management.onEnabled.addListener((ext) => {
   if (ext.id === chrome.runtime.id || isEcho(ext.id)) return;
   requestCheck();
 });
 
+// Settings changed in the popup or the settings page.
 chrome.storage.onChanged.addListener((changes, area) => {
   if (area !== 'local') return;
   if (changes[KEYS.settings]) {
@@ -628,10 +653,12 @@ chrome.permissions.onRemoved.addListener(() => {
   });
 });
 
+// Scheduled checks and permission audits.
 chrome.alarms.onAlarm.addListener((alarm) => {
   if ([CHECK_ALARM, AUDIT_ALARM, FAST_AUDIT_ALARM].includes(alarm.name)) requestCheck();
 });
 
+// A click on a notification.
 chrome.notifications.onClicked.addListener((id) => {
   if (id.startsWith('alert-')) chrome.runtime.openOptionsPage();
   if (id.startsWith(NOTIFY.ask)) {
@@ -641,6 +668,7 @@ chrome.notifications.onClicked.addListener((id) => {
     Promise.resolve().then(() => chrome.action.openPopup()).catch(() => chrome.runtime.openOptionsPage());
   }
 });
+// A click on a notification button.
 chrome.notifications.onButtonClicked.addListener((id) => {
   if (id === NOTIFY.intrusion) run(reloadAllProtectedTabs);
   if (id.startsWith(NOTIFY.frame)) run(() => reloadTab(Number(id.slice(NOTIFY.frame.length))));
@@ -652,6 +680,7 @@ chrome.runtime.onInstalled.addListener(({ reason }) => {
   if (reason === 'install') chrome.tabs.create({ url: 'welcome.html' });
 });
 
+// Chrome has a new version of Exterminator ready.
 chrome.runtime.onUpdateAvailable.addListener(() => {
   updatePending = true;
   run(async () => {

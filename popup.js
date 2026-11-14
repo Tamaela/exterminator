@@ -45,6 +45,7 @@ function renderAsks(asks, settings) {
   askEl.hidden = !askEl.childElementCount;
 }
 
+// The current tab: its protection, its level, or a form to protect it.
 function renderSite(settings, flaggedTabs) {
   const { host, site, exclusion, detected } = describeTab(tab?.url, tab?.id, settings, flaggedTabs);
   siteEl.replaceChildren();
@@ -83,6 +84,7 @@ function renderSite(settings, flaggedTabs) {
   const input = el('input', { type: 'text', value: suggestDomain(host), spellcheck: false });
   const error = el('p', { className: 'error', hidden: true });
   let level = 'strict';
+  // Adds the site with the chosen level.
   const add = () => {
     const domain = readDomain(input, error);
     if (domain) actions.chooseLevel(domain, level);
@@ -131,6 +133,7 @@ async function goToSite(domain) {
   window.close();
 }
 
+// The open protected sites as buttons that switch to their tab.
 function siteLinks(domains) {
   return domains.flatMap((domain, i) => [
     i > 0 && ', ',
@@ -138,6 +141,7 @@ function siteLinks(domains) {
   ]).filter(Boolean);
 }
 
+// Protected mode: active sites and the extensions that are off.
 function renderStatus(paused, state, byId) {
   statusEl.replaceChildren();
   if (paused) {
@@ -166,6 +170,7 @@ function renderStatus(paused, state, byId) {
   pauseBtn.textContent = paused ? t('resume') : t('pause');
 }
 
+// Draws the whole popup from storage.
 async function render() {
   const [settings, state, paused, exts, flaggedTabs, alerts, asks, consent] = await Promise.all([
     getSettings(), getState(), isPaused(), chrome.management.getAll(), getFlaggedTabs(), getAlerts(), getAsks(), hasConsent(),
