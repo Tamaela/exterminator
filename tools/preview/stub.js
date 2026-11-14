@@ -14,9 +14,10 @@
   const { version } = read('../../manifest.json');
   const scenario = new URLSearchParams(location.search).get('s') || 'detected';
 
-  const names = ['Redirect Path', 'GSC Guardian', 'Web Developer', 'Quix NG', 'uBlock Origin Lite', 'NoFollow',
-    'User-Agent Switcher', 'Cookie Banner Blocker', 'Full Page Screen Capture', 'Extension Manager',
-    'Inspect Canonical', 'YouTube Control Panel', 'Tab Counter', 'Custom New Tab URL', 'Maps Search Button', 'Translate Helper'];
+  // Made-up names: the previews also feed the Chrome Web Store screenshots.
+  const names = ['Coupon Finder', 'Grammar Helper', 'Video Downloader', 'Price Tracker', 'Dark Mode', 'Translate Helper',
+    'Screenshot Tool', 'Cookie Banner Blocker', 'Tab Organizer', 'Color Picker', 'Weather Now', 'Notes Sidebar',
+    'Shopping Assistant', 'Recipe Saver', 'Page Ruler', 'Font Finder'];
   const perms = ['cookies', 'webRequest', 'tabs', 'storage', 'management'];
   // Every third extension is on, to show rows without a "turned off" note.
   const exts = names.map((name, i) => ({

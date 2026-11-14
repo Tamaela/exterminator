@@ -34,7 +34,7 @@ This file holds the texts for the Chrome Web Store developer dashboard. Copy eac
 >
 > Source code: https://github.com/Tamaela/tab-chaperone
 
-**Screenshots** (1280 × 800): the popup on a login page with the question, the popup on a Strict site, the settings page, and the welcome page. `npm run preview` shows these pages with example data.
+**Screenshots** (1280 × 800): run `npm run screenshots` and upload the four files in `dist/screenshots/` in their numbered order. They show the popup on a login page with the question, the popup on a Strict site, the settings page and the welcome page, with made-up extension names.
 
 ## Privacy practices
 

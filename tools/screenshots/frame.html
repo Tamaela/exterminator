@@ -1,0 +1,28 @@
+<!doctype html>
+<!-- One Chrome Web Store screenshot (1280 × 800): a caption and a preview page in a frame.
+     Query: page=popup|options|welcome, s=<preview scenario>, caption=<text>. -->
+<meta charset="utf-8">
+<style>
+  html, body { margin: 0; width: 1280px; height: 800px; overflow: hidden; }
+  body {
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 28px;
+    background: linear-gradient(135deg, #0f3d22, #1a7f37);
+    font: 600 34px/1.25 system-ui, -apple-system, "Segoe UI", sans-serif; color: #fff;
+  }
+  h1 { font: inherit; margin: 0; max-width: 1100px; text-align: center; }
+  iframe { border: 0; border-radius: 12px; background: #fff; box-shadow: 0 18px 50px rgba(0, 0, 0, 0.35); }
+</style>
+<h1 id="caption"></h1>
+<iframe id="page"></iframe>
+<script>
+  const q = new URLSearchParams(location.search);
+  const page = q.get('page');
+  document.getElementById('caption').textContent = q.get('caption');
+  const frame = document.getElementById('page');
+  const popup = page === 'popup';
+  frame.width = popup ? 480 : 1100;
+  frame.height = popup ? 640 : 640;
+  frame.src = `../preview/${page}.html?s=${q.get('s')}`;
+  // The welcome page shows its consent button at the bottom.
+  if (page === 'welcome') frame.addEventListener('load', () => setTimeout(() => frame.contentWindow.scrollTo(0, 1e6), 300));
+</script>

@@ -10,7 +10,8 @@
     "test:chrome": "node --test --test-concurrency=1 \"tests/e2e/*.e2e.js\"",
     "icons": "python3 tools/make-icons.py icons",
     "package": "sh tools/package.sh",
-    "preview": "python3 -m http.server 8766 --bind 127.0.0.1"
+    "preview": "python3 -m http.server 8766 --bind 127.0.0.1",
+    "screenshots": "node tools/screenshots/make.js"
   },
   "devDependencies": {
     "jsdom": "24.1.3",
