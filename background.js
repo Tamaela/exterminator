@@ -26,10 +26,24 @@ const HISTORY_MAX = 20;
 
 // --- Task queue ---------------------------------------------------------------------------
 
-// All tasks run one after another to avoid race conditions.
+// Rejects when a promise takes too long. Some Chrome calls never settle (e.g. injecting into a
+// discarded or frozen tab); one of those must never stall protection.
+function withTimeout(promise, ms, what) {
+  let timer;
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => { timer = setTimeout(() => reject(new Error(`${what} timed out`)), ms); }),
+  ]).finally(() => clearTimeout(timer));
+}
+
+// All tasks run one after another to avoid race conditions. A task that hangs is abandoned
+// after TASK_TIMEOUT_MS so the tasks behind it (turning extensions off) still run.
+const TASK_TIMEOUT_MS = 15000;
 let queue = Promise.resolve();
 function run(task) {
-  queue = queue.then(task).catch((err) => logError('errInternal', {}, err));
+  queue = queue
+    .then(() => withTimeout(Promise.resolve().then(task), TASK_TIMEOUT_MS, 'task'))
+    .catch((err) => logError('errInternal', {}, err));
   return queue;
 }
 
@@ -56,7 +70,7 @@ async function logError(contextKey, params, err) {
 
 async function notify(id, options) {
   try {
-    await chrome.notifications.create(id, { type: 'basic', iconUrl: 'icons/icon128.png', priority: 2, ...options });
+    await withTimeout(chrome.notifications.create(id, { type: 'basic', iconUrl: 'icons/icon128.png', priority: 2, ...options }), 3000, 'notification');
   } catch (err) {
     await logError('errNotify', {}, err);
   }
@@ -75,7 +89,7 @@ function isEcho(id) {
 async function setEnabled(id, enabled, name) {
   if (enabled) expectedEnables.set(id, Date.now() + 5000);
   try {
-    await chrome.management.setEnabled(id, enabled);
+    await withTimeout(chrome.management.setEnabled(id, enabled), 5000, 'setEnabled');
     return true;
   } catch (err) {
     expectedEnables.delete(id);
@@ -131,15 +145,17 @@ async function syncDetector(settings, { injectOpen = false } = {}) {
     await chrome.scripting.unregisterContentScripts({ ids: [DETECTOR_ID] });
   }
   if (!want) await setFlaggedTabs({});
-  if (want && (injectOpen || !current)) await injectDetector(js);
+  // Not awaited: injecting can be slow or never finish for some tabs, and must not hold up
+  // the task queue (turning extensions off).
+  if (want && (injectOpen || !current)) injectDetector(js).catch(() => {});
 }
 
 // Runs the detector in pages that are already open (it ignores a second injection).
 async function injectDetector(js) {
-  const tabs = await chrome.tabs.query({ url: DETECTOR_ORIGINS });
-  await Promise.all(tabs.map((tab) => chrome.scripting
-    .executeScript({ target: { tabId: tab.id, allFrames: true }, files: js })
-    .catch(() => {}))); // e.g. an error page or the Web Store
+  const tabs = await chrome.tabs.query({ url: DETECTOR_ORIGINS, discarded: false });
+  await Promise.all(tabs.filter((tab) => !tab.frozen).map((tab) => withTimeout(chrome.scripting
+    .executeScript({ target: { tabId: tab.id, allFrames: true }, files: js }), 5000, 'inject')
+    .catch(() => {}))); // e.g. an error page, the Web Store, or a tab that doesn't respond
 }
 
 // A tab with a sensitive field stays protected for as long as it stays on that host.
@@ -242,9 +258,16 @@ const recordPrerender = (tabId, host) => addHost(getPrerenderTabs, setPrerenderT
 // Protected hosts in the sub-frames a tab has right now. Needed when frames exist without a
 // new commit: a page restored from the back/forward cache, or after Exterminator restarted.
 async function rescanFrames(tabId) {
+  const found = await protectedFrameHosts(tabId);
+  for (const host of found) await recordFrame(tabId, host);
+  return found;
+}
+
+// Read-only, so it can run for many tabs at once.
+async function protectedFrameHosts(tabId) {
   let frames;
   try {
-    frames = await chrome.webNavigation.getAllFrames({ tabId });
+    frames = await withTimeout(chrome.webNavigation.getAllFrames({ tabId }), 2000, 'getAllFrames');
   } catch {
     return [];
   }
@@ -255,7 +278,6 @@ async function rescanFrames(tabId) {
     const host = hostOf(frame.url);
     if (host && matchSite(host, sites)) found.add(host);
   }
-  for (const host of found) await recordFrame(tabId, host);
   return [...found];
 }
 
@@ -385,8 +407,8 @@ async function clearClipboard() {
         justification: t('clipboardJustification'),
       });
     }
-    const response = await chrome.runtime.sendMessage({ target: 'offscreen', type: 'clear-clipboard' });
-    await chrome.offscreen.closeDocument();
+    const response = await withTimeout(chrome.runtime.sendMessage({ target: 'offscreen', type: 'clear-clipboard' }), 5000, 'clipboard');
+    await chrome.offscreen.closeDocument().catch(() => {});
     if (!response?.ok) throw new Error('copy command was rejected');
     await addLog({ type: 'clipboard' });
   } catch (err) {
@@ -524,7 +546,7 @@ async function evaluate(opts = {}) {
 
 async function reloadTab(tabId, url) {
   try {
-    await (url ? chrome.tabs.update(tabId, { url }) : chrome.tabs.reload(tabId));
+    await withTimeout(url ? chrome.tabs.update(tabId, { url }) : chrome.tabs.reload(tabId), 5000, 'reload');
   } catch (err) {
     await logError('errReload', {}, err);
   }
@@ -732,16 +754,19 @@ async function boot() {
   await restrictStorage();
   if (await isBooted()) return;
   await migrate();
+  // Marked first: if a later step hangs or fails, the next worker start must not repeat it.
+  await markBooted();
+  await chrome.alarms.create(AUDIT_ALARM, { periodInMinutes: AUDIT_MINUTES });
   try {
     // After an update or restart, what we knew about open pages is gone: rebuild it before the
     // first check, so tabs protected by a frame or a detected field don't lose protection.
     await syncDetector(await getSettings(), { injectOpen: true });
-    for (const tab of await chrome.tabs.query({})) await rescanFrames(tab.id);
+    const tabs = await chrome.tabs.query({ discarded: false });
+    const hosts = await Promise.all(tabs.map((tab) => protectedFrameHosts(tab.id)));
+    for (const [i, tab] of tabs.entries()) for (const host of hosts[i]) await recordFrame(tab.id, host);
   } catch (err) {
     await logError('errInternal', {}, err);
   }
-  await chrome.alarms.create(AUDIT_ALARM, { periodInMinutes: AUDIT_MINUTES });
-  await markBooted();
   await protect();
 }
 run(boot);
