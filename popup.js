@@ -62,12 +62,12 @@ function renderSite(settings, flaggedTabs) {
   if (settings.fieldDetection && exclusion) {
     siteEl.append(
       el('p', { className: 'muted', textContent: t('autoOffFor', { domain: exclusion }) }),
-      el('button', { className: 'secondary small', textContent: t('turnBackOn'), onclick: () => actions.removeExclusion(exclusion) }),
+      el('button', { className: 'secondary', textContent: t('turnBackOn'), onclick: () => actions.removeExclusion(exclusion) }),
     );
   } else if (detected) {
     siteEl.append(
       el('p', { className: 'ok', textContent: t('detectedProtected') }),
-      el('button', { className: 'secondary small', textContent: t('neverAutoProtect'), onclick: () => actions.addExclusion(suggestDomain(host)) }),
+      el('button', { className: 'secondary', textContent: t('neverAutoProtect'), onclick: () => actions.addExclusion(suggestDomain(host)) }),
     );
   }
   const loginOnly = settings.fieldDetection && findDomain(host, settings.loginOnly);
