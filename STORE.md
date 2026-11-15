@@ -34,7 +34,11 @@ This file holds the texts for the Chrome Web Store developer dashboard. Copy eac
 >
 > Source code: https://github.com/Tamaela/tab-chaperone
 
-**Screenshots** (1280 × 800): run `npm run screenshots` and upload the four files in `dist/screenshots/` in their numbered order. They show the popup on a login page with the question, the popup on a Strict site, the settings page and the welcome page, with made-up extension names.
+**Screenshots** (1280 × 800): run `npm run screenshots` and upload the five numbered files in `dist/screenshots/` in their order, both as global and as English (localized) screenshots. They show the popup on a login page with the question, the popup on a Strict site, the settings page, the risk labels and the welcome page, with made-up extension names.
+
+**Promo images:** `promo-small-440x280.png` is the small promo tile. The store shows it on the home page, in categories and in search results. `promo-marquee-1400x560.png` is the optional marquee, used only if the store features the item.
+
+**Store icon:** `dist/store-icon-128.png`, made by `npm run icons`.
 
 ## Privacy practices
 

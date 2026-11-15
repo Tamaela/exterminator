@@ -1,6 +1,6 @@
 <!doctype html>
 <!-- One Chrome Web Store screenshot (1280 × 800): a caption and a preview page in a frame.
-     Query: page=popup|options|welcome, s=<preview scenario>, caption=<text>. -->
+     Query: page=popup|options|welcome, s=<preview scenario>, caption=<text>, scroll=<element id>. -->
 <meta charset="utf-8">
 <style>
   html, body { margin: 0; width: 1280px; height: 800px; overflow: hidden; }
@@ -23,6 +23,10 @@
   frame.width = popup ? 480 : 1100;
   frame.height = popup ? 640 : 640;
   frame.src = `../preview/${page}.html?s=${q.get('s')}`;
-  // The welcome page shows its consent button at the bottom.
-  if (page === 'welcome') frame.addEventListener('load', () => setTimeout(() => frame.contentWindow.scrollTo(0, 1e6), 300));
+  // The welcome page shows its consent button at the bottom; `scroll` names an element to show.
+  frame.addEventListener('load', () => setTimeout(() => {
+    const target = q.get('scroll') && frame.contentDocument.getElementById(q.get('scroll'));
+    if (target) target.closest('section').scrollIntoView();
+    else if (page === 'welcome') frame.contentWindow.scrollTo(0, 1e6);
+  }, 300));
 </script>
