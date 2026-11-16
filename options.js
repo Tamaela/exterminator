@@ -1,7 +1,7 @@
 import { t, localizePage } from './lib/i18n.js';
 import { riskOf, describePermission, canManageExtensions, sortByRisk, permissionSnapshot } from './lib/risk.js';
 import {
-  KEYS, getSettings, getState, getAlerts, getLog, clearLog, logText, actions, getAsks, exportSettings, importSettings,
+  KEYS, getSettings, getState, getAlerts, getLog, clearLog, logText, actions, getAsks, openAsks, exportSettings, importSettings,
 } from './lib/storage.js';
 import { el, readDomain, onStorageChange } from './lib/ui.js';
 import { levelPicker, askCards, levelsFor } from './lib/levels.js';
@@ -122,8 +122,11 @@ function renderExclusions(settings) {
 
 // Questions about detected sites that still wait for a level.
 function renderAsks(asks, settings) {
+  const open = openAsks(asks, settings);
   $('asks').replaceChildren(...askCards(asks, settings));
-  $('asks-card').hidden = !$('asks').childElementCount;
+  $('asks-dismiss-all').onclick = () => actions.dismissAsks(open);
+  $('asks-clear').onclick = () => actions.clearAsks(open);
+  $('asks-card').hidden = !open.length;
 }
 
 // The newest activity log entries.

@@ -1,7 +1,7 @@
 import './chrome-stub.js';
 import { test, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { migrate, getSettings, isPaused, pauseFor, getState, actions, addLog, getLog, logText, normalizeSettings, LOG_MAX, SCHEMA_VERSION, getAsks, setAsks, openAsks, hasConsent, giveConsent, exportSettings, importSettings, prepareImport } from '../lib/storage.js';
+import { migrate, getSettings, isPaused, pauseFor, getState, actions, addLog, getLog, logText, normalizeSettings, LOG_MAX, SCHEMA_VERSION, getAsks, setAsks, openAsks, unansweredAsks, hasConsent, giveConsent, exportSettings, importSettings, prepareImport } from '../lib/storage.js';
 import { PAUSE_MAX_MS } from '../lib/planner.js';
 
 beforeEach(() => {
@@ -95,6 +95,22 @@ test('answering the question stores the level and closes the question', async ()
   assert.deepEqual(s.detectionExclusions, ['shop.com']);
   assert.deepEqual(Object.keys(await getAsks()), ['news.com']);
   assert.deepEqual(openAsks({ 'news.com': 1, 'login.social.com': 2 }, s), ['news.com'], 'a site that is already covered is not asked about');
+});
+
+test('"Clear" removes questions but keeps dismissed sites', async () => {
+  await setAsks({ 'forum.com': 1, 'news.com': false, 'shop.com': 3 });
+  await actions.clearAsks(['forum.com', 'news.com']);
+  assert.deepEqual(await getAsks(), { 'news.com': false, 'shop.com': 3 });
+});
+
+test('"Don\'t ask again" closes the question but keeps the site known', async () => {
+  await setAsks({ 'forum.com': 1, 'news.com': 2 });
+  await actions.dismissAsks(['forum.com', 'gone.com']);
+  const asks = await getAsks();
+  assert.deepEqual(asks, { 'forum.com': false, 'news.com': 2 }, 'a dismissed site stays stored, so it is not asked about again');
+  const s = await getSettings();
+  assert.deepEqual(openAsks(asks, s), ['news.com']);
+  assert.deepEqual(unansweredAsks(asks, s), ['forum.com', 'news.com']);
 });
 
 test('"Allow again" approves the permissions shown in the alert, in one write', async () => {

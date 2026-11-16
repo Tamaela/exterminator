@@ -8,7 +8,7 @@ import {
   KEYS, migrate, getSettings, isPaused, setPaused, getState, setState,
   getAlerts, setAlerts, getApprovals, setApprovals, addLog, actions,
   getTabData, setTabData, getFlaggedTabs, getFramedTabs,
-  isBooted, markBooted, isUpdatePending, markUpdatePending, getAsks, setAsks, openAsks, hasConsent,
+  isBooted, markBooted, isUpdatePending, markUpdatePending, getAsks, setAsks, openAsks, unansweredAsks, hasConsent,
 } from './lib/storage.js';
 
 // Grace period before extensions come back or a site is cleaned up, so that
@@ -452,9 +452,11 @@ async function evaluate(opts = {}) {
 
   // Questions answered elsewhere (a site added, excluded or marked "login only") are dropped,
   // so a site you later remove is asked about again on its next detection.
+  // Dismissed questions are kept, so the site is not asked about again.
   const asks = await getAsks();
+  const kept = unansweredAsks(asks, settings);
+  if (kept.length !== Object.keys(asks).length) await setAsks(Object.fromEntries(kept.map((d) => [d, asks[d]])));
   const open = openAsks(asks, settings);
-  if (open.length !== Object.keys(asks).length) await setAsks(Object.fromEntries(open.map((d) => [d, asks[d]])));
   await setBadge({ ...p.badge, ask: open.length > 0 });
   p.scheduleCheck ? scheduleCheck() : cancelCheck();
   const active = nextState.activeSites.length > 0;

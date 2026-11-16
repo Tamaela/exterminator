@@ -521,6 +521,27 @@
   "asksHeading": {
     "message": "Choose a protection level"
   },
+  "asksIntro": {
+    "message": "Tab Chaperone found a password, code or payment field on these sites. Until you choose, automatic protection turns extensions off on the pages with such a field."
+  },
+  "asksDismissAll": {
+    "message": "Don't ask about these sites again"
+  },
+  "asksClear": {
+    "message": "Clear"
+  },
+  "asksClearHelp": {
+    "message": "Removes these questions. A site comes back here when Tab Chaperone finds a password, code or payment field on it again."
+  },
+  "askDismiss": {
+    "message": "Don't ask again"
+  },
+  "askDismissHelp": {
+    "message": "Automatic protection keeps turning extensions off on pages of this site with a password, code or payment field."
+  },
+  "asksOther": {
+    "message": "Other sites that wait for a protection level: {count}."
+  },
   "askNotifyTitle": {
     "message": "Extensions are off on {domain}"
   },

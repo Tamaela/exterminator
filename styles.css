@@ -192,7 +192,11 @@ button.site-link:hover { filter: none; text-decoration-thickness: 2px; }
 }
 .ask-card button.level-choice { display: block; width: 100%; text-align: left; margin: 6px 0; }
 .ask-card button.level-choice span { display: block; font-size: 12px; opacity: 0.85; }
-.ask-card button.danger { margin-top: 4px; }
+.ask-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
+.ask-fold, .ask-group { margin: 0 0 8px; }
+.ask-fold > summary { margin: 0; padding: 4px 0; color: var(--fg); }
+.ask-fold > .ask-card { margin-top: 6px; }
+.ask-group > summary { margin: 0 0 6px; }
 .popup #asks:not([hidden]) { padding-bottom: 0; }
 
 /* Welcome page */

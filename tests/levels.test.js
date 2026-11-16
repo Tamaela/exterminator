@@ -25,6 +25,16 @@ test('"Never protect this site" needs a second click', async () => {
   assert.deepEqual(await getAsks(), {});
 });
 
+test('"Don\'t ask again" in the question dismisses it', async () => {
+  chrome.storage.local.reset();
+  await setAsks({ 'shop.com': 1 });
+  const card = askCard('shop.com');
+  [...card.querySelectorAll('button')].find((b) => b.textContent === 'askDismiss' || b.textContent === "Don't ask again").click();
+  await settle();
+  assert.deepEqual(await getAsks(), { 'shop.com': false });
+  assert.deepEqual((await getSettings()).sites, []);
+});
+
 test('choosing a level in the question adds the site', async () => {
   chrome.storage.local.reset();
   const card = askCard('bank.com');

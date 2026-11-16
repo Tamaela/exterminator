@@ -4,10 +4,10 @@ import { describeTab, siteForTab, wholeSites } from './lib/planner.js';
 import { riskOf, permissionSnapshot } from './lib/risk.js';
 import {
   KEYS, getSettings, getState, isPaused, setPaused, pauseFor, getAlerts, getFlaggedTabs, getFramedTabs, actions,
-  getAsks, hasConsent,
+  getAsks, openAsks, hasConsent,
 } from './lib/storage.js';
 import { el, readDomain, onStorageChange } from './lib/ui.js';
-import { levelPicker, askCards, levelsFor } from './lib/levels.js';
+import { levelPicker, askCard, foldedAsk, clearAsksButton, levelsFor } from './lib/levels.js';
 
 localizePage();
 
@@ -38,10 +38,19 @@ function renderWarnings(alerts, consent) {
   warnEl.hidden = !warnEl.childElementCount;
 }
 
-// Questions about detected sites; the one for the current tab comes first.
+// The question about the current tab's site comes first and unfolded. Questions about other
+// sites are folded into one line with their number, so the popup does not fill up.
+let othersOpen = false;
 function renderAsks(asks, settings) {
   const current = suggestDomain(describeTab(tab?.url, tab?.id, settings, {}).host || '');
-  askEl.replaceChildren(...askCards(asks, settings, current));
+  const open = openAsks(asks, settings);
+  const others = open.filter((domain) => domain !== current);
+  const group = others.length > 0 && el('details', { className: 'ask-group', open: othersOpen },
+    el('summary', { textContent: t('asksOther', { count: others.length }) }),
+    el('p', {}, clearAsksButton(others)),
+    ...others.map(foldedAsk));
+  if (group) group.addEventListener('toggle', () => { othersOpen = group.open; });
+  askEl.replaceChildren(...[open.includes(current) && askCard(current), group].filter(Boolean));
   askEl.hidden = !askEl.childElementCount;
 }
 
