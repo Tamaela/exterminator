@@ -258,10 +258,16 @@
     "message": "Protected mode not active."
   },
   "resume": {
-    "message": "Resume protection"
+    "message": "Turn extensions off again"
+  },
+  "resumeHelp": {
+    "message": "Protects the paused sites again."
   },
   "pause": {
-    "message": "Pause"
+    "message": "Turn extensions on"
+  },
+  "pauseHelp": {
+    "message": "Pauses protection for the protected sites that are open now, until you leave them or for at most one hour."
   },
   "settingsLink": {
     "message": "Settings"

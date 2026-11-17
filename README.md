@@ -26,7 +26,7 @@ An extension can read everything on the pages it runs on. That includes password
 - The popup shows the protected sites that are open. Clicking a site switches to its tab.
 - The settings page can export your settings to a file and import them in another Chrome profile. An import never turns on an extension that this profile has not approved.
 - The settings page keeps an activity log. The popup warns you when Tab Chaperone has no incognito access.
-- The pause button applies to the protected sites that are open when you press it. The pause ends when you leave those sites or open another protected site. It lasts at most one hour.
+- The button "Turn extensions on" in the popup pauses protection. It applies to the protected sites that are open when you press it. "Turn extensions off again" ends the pause. The pause ends when you leave those sites or open another protected site. It lasts at most one hour.
 
 ## Install (developer mode)
 

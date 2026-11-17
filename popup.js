@@ -163,7 +163,7 @@ function siteLinks(domains) {
 }
 
 // Protected mode: active sites and the extensions that are off.
-function renderStatus(paused, state, byId) {
+function renderStatus(paused, state, byId, guard) {
   statusEl.replaceChildren();
   if (paused) {
     statusEl.append(el('p', { className: 'warn', textContent: t('pausedStatus', { sites: paused.sites.join(', ') }) }));
@@ -187,8 +187,10 @@ function renderStatus(paused, state, byId) {
   } else {
     statusEl.append(el('p', { className: 'muted', textContent: t('notActive') }));
   }
-  pauseBtn.hidden = !(paused || state.activeSites.length);
+  // While the tab waits for you to log in, its card has "Turn extensions on for now" instead.
+  pauseBtn.hidden = !(paused || (state.activeSites.length && !guard));
   pauseBtn.textContent = paused ? t('resume') : t('pause');
+  pauseBtn.title = paused ? t('resumeHelp') : t('pauseHelp');
 }
 
 // Draws the whole popup from storage.
@@ -200,7 +202,7 @@ async function render() {
   renderWarnings(alerts, consent);
   renderAsks(asks, settings);
   renderSite(settings, flaggedTabs, guard);
-  renderStatus(paused, state, new Map(exts.map((e) => [e.id, e])));
+  renderStatus(paused, state, new Map(exts.map((e) => [e.id, e])), guard);
 }
 
 pauseBtn.addEventListener('click', async () => {
