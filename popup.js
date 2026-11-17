@@ -61,7 +61,8 @@ function guardCard(guard) {
     el('p', { textContent: t(guard.seen ? 'guardStatusLogin' : 'guardStatus', { site: guard.domain }) }),
     el('div', { className: 'ask-actions' },
       el('button', { textContent: t('guardProtectSite'), onclick: () => answer('site') }),
-      el('button', { className: 'secondary', textContent: t('guardRelease'), onclick: () => answer('release') })));
+      el('button', { className: 'secondary', textContent: t('guardRelease'), onclick: () => answer('release') })),
+    el('p', { className: 'muted', textContent: t('guardReleaseHelp') }));
 }
 
 // The current tab: its protection, its level, or a form to protect it.
