@@ -172,3 +172,52 @@ test('a page element named __tabChaperoneExtended does not switch on extended mo
   const before = (w) => { w.__tabChaperoneExtended = w.document.createElement('a'); };
   assert.equal(await count('<input autocomplete="cc-number">', { before }), 0);
 });
+
+// Runs the detector with a fake connection and returns its events: 'connect' and 'disconnect'.
+async function connection(html, act) {
+  const { window } = new JSDOM(html, { runScripts: 'outside-only' });
+  const events = [];
+  window.chrome = {
+    runtime: {
+      sendMessage: () => Promise.resolve(),
+      connect: () => {
+        events.push('connect');
+        return { postMessage() {}, disconnect: () => events.push('disconnect'), onDisconnect: { addListener() {} } };
+      },
+    },
+  };
+  window.eval(code);
+  await wait(20);
+  await act(window, events);
+  window.close();
+  return events;
+}
+
+test('the connection stays open while the field is on the page and closes when it is removed', async () => {
+  const events = await connection('<div id="overlay"><input type="password"></div>', async (w, seen) => {
+    assert.deepEqual(seen, ['connect']);
+    w.document.getElementById('overlay').remove();
+    await wait(700);
+    assert.deepEqual(seen, ['connect', 'disconnect']);
+    addPassword(w.document.body, w.document); // the login form opens again
+    await wait(50);
+  });
+  assert.deepEqual(events, ['connect', 'disconnect', 'connect']);
+});
+
+test('a "show password" button does not close the connection', async () => {
+  const events = await connection('<input type="password"><p>x</p>', async (w) => {
+    w.document.querySelector('input').type = 'text';
+    w.document.querySelector('p').remove(); // a removal triggers the check
+    await wait(700);
+  });
+  assert.deepEqual(events, ['connect']);
+});
+
+test('removing another element keeps the connection open', async () => {
+  const events = await connection('<input type="password"><p>x</p>', async (w) => {
+    w.document.querySelector('p').remove();
+    await wait(700);
+  });
+  assert.deepEqual(events, ['connect']);
+});

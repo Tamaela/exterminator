@@ -16,7 +16,8 @@ An extension can read everything on the pages it runs on. That includes password
 
   New sites get the level Strict unless you choose another one. "Login pages only" requires automatic protection.
 - Extensions on the "Always on" list stay on everywhere. Use it for your password manager. Each site can allow extra extensions. With several protected sites open, an extra extension stays on only if every open site allows it. Newly installed extensions are off by default.
-- Automatic protection is optional. It protects any page with a password field. The field may be hidden or inside open or closed Shadow DOM. A second option adds credit card, CVC, 2FA, IBAN and national ID fields. This protection lasts while the tab shows that page. When you go to another page without such a field, the extensions come back after 3 seconds. You can exclude sites from automatic protection.
+- Automatic protection is optional. It protects any page with a password field. The field may be hidden or inside open or closed Shadow DOM. A second option adds credit card, CVC, 2FA, IBAN and national ID fields. This protection lasts while the tab shows a sensitive field. The extensions come back 10 seconds after the last field is gone, or 3 seconds after you go to another page without such a field. You can exclude sites from automatic protection.
+- Many sites open their login form in an overlay after the page has loaded. The reload that protection needs closes that form. The tab then stays protected on that site while you open the form again, and until you have logged in. A notification and the popup explain this. They offer two buttons: "Always protect this site" sets the level Whole site, and "Turn extensions back on" ends the protection for that tab. Without a login form, the protection ends after 10 minutes.
 - The first detection on a site you have not classified shows a notification. The toolbar icon then shows an orange "?". The popup asks which level the site gets. You can also choose "Never protect this site", which needs a second click. Tab Chaperone asks once per site. The question appears only in the popup and the settings page. A web page cannot display or click it.
 - Tab Chaperone checks the permissions of every allowed extension. An extension that gains new permissions in an update is removed from the lists until you approve it again.
 - Each extension gets a high, medium or low risk label based on its permissions.
@@ -44,7 +45,7 @@ Turning an extension off does not remove the scripts it already injected into a 
 | Path | Purpose |
 |---|---|
 | `background.js` | The service worker handles events, applies plans and checks permissions. |
-| `detector.js` | This optional content script reports that a page has a sensitive field. It never sends page content. |
+| `detector.js` | This optional content script reports that a page has a sensitive field. It keeps a connection to the service worker open while the field is on the page. It never sends page content. |
 | `detector-extended.js` | This file turns on the extra field types. It is injected only when that option is on. |
 | `popup.*`, `options.*` | These files make up the toolbar popup and the settings page. |
 | `offscreen.*` | This hidden document clears the clipboard. |

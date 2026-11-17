@@ -1,5 +1,6 @@
-// Content script: tells the background worker as soon as the page contains a sensitive field.
-// Only sends "there is a sensitive field", never any page content. It does not use
+// Content script: tells the background worker as soon as the page contains a sensitive field,
+// and keeps a connection open for as long as it does. Only sends "there is a sensitive field",
+// never any page content. It does not use
 // chrome.storage: the extended mode arrives via detector-extended.js (see background.js).
 //
 // Cost model: one full scan when the page starts, at DOMContentLoaded/load and a few times
@@ -56,8 +57,20 @@
       return false;
     }
   };
+  const PORT_NAME = 'tab-chaperone-field';
+  // Messages on the connection keep the background worker running while the field is there.
+  const PING_MS = 20000;
+  // Removals are checked in a batch: a script often replaces a form in several steps.
+  const GONE_CHECK_MS = 500;
   let reported = false;
   let found = false;
+  // The sensitive fields found so far. A field that turns into a plain text field (a "show
+  // password" button) still counts while it is on the page.
+  let fields = [];
+  let port = null;
+  let pinger = null;
+  let goneTimer = null;
+  let stopped = false;
   // True for a document that is shown again (back/forward cache) or was prerendered:
   // it may hold scripts from extensions that were on at the time, so the tab must reload.
   let reused = false;
@@ -73,18 +86,60 @@
     return SENSITIVE_NAME.test(`${input.name || ''} ${input.id || ''}`);
   }
 
-  // Tells the background worker once that this page has a sensitive field.
-  function report() {
+  // Tells the background worker once that this page has a sensitive field, and opens the
+  // connection that stays open while it has one.
+  function report(field) {
     found = true;
+    if (field && !fields.includes(field)) fields.push(field);
     // A prerendered page is not visible yet and belongs to no tab the user sees: wait.
     if (reported || document.prerendering) return;
     reported = true;
-    observer.disconnect();
     try {
       chrome.runtime.sendMessage({ type: 'sensitive-field', reused }).catch(() => {});
     } catch {
       // Extension reloaded or context invalidated: ignore.
     }
+    connect();
+  }
+
+  // Opens the connection. When the background worker restarts, it closes: open it again.
+  function connect() {
+    if (port || stopped) return;
+    try {
+      port = chrome.runtime.connect({ name: PORT_NAME });
+    } catch {
+      return; // extension reloaded or context invalidated
+    }
+    pinger = setInterval(() => port?.postMessage('ping'), PING_MS);
+    port.onDisconnect.addListener(() => {
+      clearInterval(pinger);
+      port = null;
+      if (reported) setTimeout(connect, 1000);
+    });
+  }
+
+  // Closes the connection: the page has no sensitive field any more.
+  function disconnect() {
+    clearInterval(pinger);
+    const open = port;
+    port = null;
+    open?.disconnect();
+  }
+
+  // True while a field found earlier is still on the page, or the page has another one.
+  const hasField = () => fields.some((field) => field.isConnected) || !!scan(document);
+
+  // After nodes were removed: when no sensitive field is left, close the connection and watch
+  // for the next one.
+  function checkGone() {
+    clearTimeout(goneTimer);
+    goneTimer = setTimeout(() => {
+      if (!reported || hasField()) return;
+      reported = false;
+      found = false;
+      fields = [];
+      disconnect();
+    }, GONE_CHECK_MS);
   }
 
   // Watches a shadow root for new fields.
@@ -95,12 +150,14 @@
   }
 
   // Searches a node (element, document or shadow root) including open and closed shadow roots.
+  // Returns the first sensitive field, or null.
   function scan(node) {
-    if (node instanceof HTMLInputElement && isSensitiveInput(node)) return true;
-    if (!node.querySelectorAll) return false;
-    if (node.querySelector(PASSWORD)) return true;
+    if (node instanceof HTMLInputElement && isSensitiveInput(node)) return node;
+    if (!node.querySelectorAll) return null;
+    const password = node.querySelector(PASSWORD);
+    if (password) return password;
     for (const input of node.querySelectorAll(sensitive ? 'input' : MASKABLE)) {
-      if (isSensitiveInput(input)) return true;
+      if (isSensitiveInput(input)) return input;
     }
     const roots = [];
     const own = node instanceof Element ? shadowOf(node) : null;
@@ -111,25 +168,33 @@
     }
     for (const root of roots) {
       watch(root);
-      if (scan(root)) return true;
+      const field = scan(root);
+      if (field) return field;
     }
-    return false;
+    return null;
   }
 
   // Scans the whole document, unless a field was already reported.
   function fullScan() {
-    if (!reported && (found || scan(document))) report();
+    if (reported) return;
+    if (found) return report();
+    const field = scan(document);
+    if (field) report(field);
   }
 
   const observer = new MutationObserver((records) => {
-    if (reported) return;
+    if (reported) {
+      if (records.some((record) => record.removedNodes.length)) checkGone();
+      return;
+    }
     for (const record of records) {
       if (record.type === 'attributes') {
-        if (record.target instanceof HTMLInputElement && isSensitiveInput(record.target)) return report();
+        if (record.target instanceof HTMLInputElement && isSensitiveInput(record.target)) return report(record.target);
         continue;
       }
       for (const node of record.addedNodes) {
-        if (node.nodeType === Node.ELEMENT_NODE && scan(node)) return report();
+        const field = node.nodeType === Node.ELEMENT_NODE ? scan(node) : null;
+        if (field) return report(field);
       }
     }
   });
@@ -139,6 +204,8 @@
   function restart() {
     reported = false;
     found = false;
+    fields = [];
+    disconnect();
     watchedRoots = new WeakSet();
     observer.observe(document, OBSERVE);
     fullScan();
@@ -164,6 +231,8 @@
     stop: () => {
       reported = true; // never reports again
       observer.disconnect();
+      stopped = true;
+      disconnect();
     },
   };
   window.addEventListener('pageshow', (e) => {
@@ -176,10 +245,11 @@
   document.addEventListener('focusin', (e) => {
     const target = e.composedPath()[0];
     if (target instanceof HTMLInputElement) {
-      if (isSensitiveInput(target)) report();
+      if (isSensitiveInput(target)) report(target);
     } else if (target instanceof Element) {
       const root = shadowOf(target);
-      if (root && scan(root)) report();
+      const field = root && scan(root);
+      if (field) report(field);
     }
   }, true);
 

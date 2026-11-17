@@ -26,7 +26,19 @@ function extensionCopy() {
   return dir;
 }
 
-// Test pages: a login form that posts and redirects, and a page without fields.
+// A page that opens its login form as an overlay, the way many shops do.
+const OVERLAY_PAGE = `<button id="open">Log in</button><script>
+document.getElementById('open').onclick = () => {
+  const overlay = document.createElement('div');
+  overlay.id = 'overlay';
+  overlay.innerHTML = '<input type="password"><button id="done">Done</button>';
+  document.body.append(overlay);
+  document.getElementById('done').onclick = () => overlay.remove();
+};
+</script>`;
+
+// Test pages: a login form that posts and redirects, a page with a login overlay and a page
+// without fields.
 function startServer() {
   const server = createServer((req, res) => {
     if (req.method === 'POST') {
@@ -36,7 +48,7 @@ function startServer() {
     }
     const body = req.url.startsWith('/login')
       ? '<form method="post"><input type="password" name="password"><button>Log in</button></form>'
-      : '<h1>List</h1><p>No fields here.</p>';
+      : req.url.startsWith('/deals') ? OVERLAY_PAGE : '<h1>List</h1><p>No fields here.</p>';
     res.writeHead(200, { 'Content-Type': 'text/html' }).end(body);
   });
   return new Promise((resolve) => server.listen(0, '127.0.0.1', () => resolve(server)));
@@ -106,7 +118,38 @@ test('a detected password field: off on the login page, back on after logging in
     await chrome.page.waitForSelector('form');
     await Promise.all([chrome.page.waitForNavigation(), chrome.page.$eval('form', (form) => form.submit())]);
     assert.ok(chrome.page.url().endsWith('/list'));
-    await waitFor(() => chrome.dummyOn(), 10000, 'dummy back on after logging in');
+    await waitFor(() => chrome.dummyOn(), 20000, 'dummy back on after logging in');
+  } finally {
+    await chrome.stop();
+  }
+});
+
+test('a login overlay: the reload closes it, the tab stays protected until the form is gone', async () => {
+  const chrome = await start({ consent: true, settings: settings({ fieldDetection: true }) });
+  const page = chrome.page;
+  const loaded = () => page.evaluate(() => document.readyState === 'complete' && !!document.getElementById('open')).catch(() => false);
+  try {
+    await page.goto(chrome.url('127.0.0.1', '/deals'));
+    await waitFor(loaded, 5000, 'deals page');
+    assert.equal(await chrome.dummyOn(), true, 'no field yet');
+    await page.evaluate(() => { window.firstDocument = true; });
+    await page.click('#open');
+    await waitFor(async () => !(await chrome.dummyOn()), 8000, 'dummy off when the form opens');
+    await waitFor(async () => (await loaded()) && !(await page.evaluate(() => window.firstDocument).catch(() => true)), 8000, 'the reload');
+    await new Promise((r) => setTimeout(r, 5000)); // longer than the grace period
+    assert.equal(await chrome.dummyOn(), false, 'still off after the reload, without a field');
+
+    await page.evaluate(() => { window.secondDocument = true; });
+    await page.click('#open'); // open the login form again
+    await new Promise((r) => setTimeout(r, 3000));
+    assert.equal(await page.evaluate(() => window.secondDocument), true, 'no second reload');
+    assert.equal(await chrome.dummyOn(), false);
+
+    await page.click('#done'); // logged in: the form closes
+    await new Promise((r) => setTimeout(r, 5000));
+    assert.equal(await chrome.dummyOn(), false, 'a short gap without a field keeps it off');
+    await waitFor(() => chrome.dummyOn(), 20000, 'dummy back on after the form is gone');
+    assert.equal(await page.evaluate(() => window.secondDocument), true, 'the page was not reloaded');
   } finally {
     await chrome.stop();
   }

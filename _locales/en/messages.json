@@ -461,6 +461,24 @@
   "storageUnrestrictedMessage": {
     "message": "This Chrome version cannot keep Tab Chaperone's settings out of reach of web pages, so the field detector is not injected. Protection for your configured sites still works."
   },
+  "reloadedTitle": {
+    "message": "{site} was reloaded"
+  },
+  "reloadedMessage": {
+    "message": "Other extensions could read the login form, so Tab Chaperone reloaded the page. Open the login form again. Extensions stay off until you are logged in."
+  },
+  "guardStatus": {
+    "message": "Other extensions could read the login form, so Tab Chaperone reloaded the page. If the form closed, open it again. Extensions stay off on {site} in this tab until you are logged in."
+  },
+  "guardStatusLogin": {
+    "message": "Extensions stay off on {site} in this tab until you are logged in. They come back on 10 seconds after the login form is gone."
+  },
+  "guardProtectSite": {
+    "message": "Always protect this site"
+  },
+  "guardRelease": {
+    "message": "Turn extensions back on"
+  },
   "staleTabTitle": {
     "message": "Reopen recommended"
   },

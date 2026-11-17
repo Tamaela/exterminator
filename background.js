@@ -1,5 +1,5 @@
 import { t } from './lib/i18n.js';
-import { hostOf, matchSite } from './lib/domains.js';
+import { hostOf, matchSite, suggestDomain } from './lib/domains.js';
 import { plan, siteForTab, allowlistedIds, wholeSites } from './lib/planner.js';
 import { describePermission, permissionSnapshot } from './lib/risk.js';
 import { DETECTOR_ORIGINS, detectorFiles } from './lib/detection.js';
@@ -20,8 +20,9 @@ const AUDIT_MINUTES = 30;
 // While protected mode is active, permissions of allowed extensions are re-checked every minute
 // (permissions granted at runtime fire no event).
 const FAST_AUDIT_ALARM = 'tab-chaperone-audit-active';
+const RELEASE_ALARM = 'tab-chaperone-release';
 const DETECTOR_ID = 'field-detector';
-const NOTIFY = { intrusion: 'intrusion', frame: 'frame-', stale: 'stale-', disableFailed: 'disable-failed', clipboard: 'clipboard-failed', ask: ASK_NOTIFICATION };
+const NOTIFY = { intrusion: 'intrusion', frame: 'frame-', stale: 'stale-', reloaded: 'reloaded-', disableFailed: 'disable-failed', clipboard: 'clipboard-failed', ask: ASK_NOTIFICATION };
 
 // --- Task queue ---------------------------------------------------------------------------
 
@@ -171,7 +172,71 @@ const tracker = createTabTracker({
   },
   getTab: (tabId) => chrome.tabs.get(tabId).catch(() => null),
 });
-const { flagTab, recheckTab, isFlaggedPage, forgetTab, recordLoad, recordOpener, recordFrame, recordPrerender, replaceTab } = tracker;
+const {
+  flagTab, recheckTab, isFlaggedPage, forgetTab, recordLoad, recordOpener, recordFrame, recordPrerender, replaceTab,
+  guardTab, fieldsPresent, fieldsGone, releaseTab, expire,
+} = tracker;
+
+// --- Fields on the page ----------------------------------------------------------------------
+
+// Each detector that found a field keeps a connection open while the field is on its page.
+// The connection closes when the field is removed, the page is left or its frame is removed.
+const FIELD_PORT = 'tab-chaperone-field';
+const fieldPorts = new Map(); // tabId -> Set of open connections
+
+chrome.runtime.onConnect.addListener((port) => {
+  const tabId = port.sender?.tab?.id;
+  if (port.name !== FIELD_PORT || tabId == null) return;
+  if (port.sender.documentLifecycle && port.sender.documentLifecycle !== 'active') return port.disconnect();
+  if (!fieldPorts.has(tabId)) fieldPorts.set(tabId, new Set());
+  fieldPorts.get(tabId).add(port);
+  chrome.notifications.clear(`${NOTIFY.reloaded}${tabId}`); // you opened the login form again
+  run(() => fieldsPresent(tabId));
+  port.onMessage.addListener(() => {}); // pings keep the worker running
+  port.onDisconnect.addListener(() => {
+    const ports = fieldPorts.get(tabId);
+    ports?.delete(port);
+    if (ports?.size) return;
+    fieldPorts.delete(tabId);
+    run(async () => {
+      await fieldsGone(tabId);
+      await protect(); // schedules the release
+    });
+  });
+});
+
+// A tab reloaded because of a detected field, still without a field a few seconds later: the
+// reload probably closed a login form that a script opened. Explain, and offer the choices.
+const RELOADED_NOTICE_MS = 5000;
+async function explainReload(tabId) {
+  const guard = (await getTabData('guarded'))[tabId];
+  if (!guard || guard.seen) return;
+  await notify(`${NOTIFY.reloaded}${tabId}`, {
+    title: t('reloadedTitle', { site: guard.domain }),
+    message: t('reloadedMessage'),
+    buttons: [{ title: t('guardProtectSite') }, { title: t('guardRelease') }],
+  });
+}
+
+// "Always protect this site" (the level Whole site) or "Turn extensions back on" for a guarded tab.
+async function answerGuard(tabId, choice) {
+  const guard = (await getTabData('guarded'))[tabId];
+  if (!guard) return;
+  if (choice === 'site') await actions.chooseLevel(guard.domain, 'site');
+  await releaseTab(tabId);
+  chrome.notifications.clear(`${NOTIFY.reloaded}${tabId}`);
+  await protect();
+}
+
+let releaseTimer = null;
+// Checks again when the next flagged tab is due for release.
+function scheduleRelease(at) {
+  clearTimeout(releaseTimer);
+  releaseTimer = null;
+  if (at == null) return chrome.alarms.clear(RELEASE_ALARM);
+  releaseTimer = setTimeout(requestCheck, Math.max(0, at - Date.now()) + 100);
+  chrome.alarms.create(RELEASE_ALARM, { when: Math.max(at, Date.now() + 30000) }); // if the worker stops
+}
 
 // Protected hosts in the sub-frames a tab has right now. Needed when frames exist without a
 // new commit: a page restored from the back/forward cache, or after Tab Chaperone restarted.
@@ -382,6 +447,7 @@ async function evaluate(opts = {}) {
   } catch (err) {
     await logError('errInternal', {}, err); // never skip turning extensions off because of this
   }
+  scheduleRelease(await expire());
   const [settings, state, paused, flaggedTabs, framedTabs, prerenderTabs, inheritedTabs, loadTimes, tabs, extensions] = await Promise.all([
     getSettings(), getState(), isPaused(), getFlaggedTabs(), getFramedTabs(), getTabData('prerender'), getTabData('inherited'),
     getTabData('loadTimes'), chrome.tabs.query({}), chrome.management.getAll(),
@@ -487,7 +553,15 @@ async function protect(opts = {}) {
   if (p.restartNavigation && await stillHeadingTo(p.restartNavigation)) {
     await reloadTab(p.restartNavigation.tabId, p.restartNavigation.url);
   }
-  for (const tabId of p.reloadTabIds) await reloadTab(tabId);
+  const flagged = p.reloadTabIds.length ? await getFlaggedTabs() : {};
+  for (const tabId of p.reloadTabIds) {
+    // Reloaded because of a detected field (not a site on your list as a whole): guard it.
+    const guard = tabId in flagged && matchSite(flagged[tabId], wholeSites(p.settings)) == null;
+    if (guard) await guardTab(tabId, flagged[tabId]);
+    await reloadTab(tabId);
+    if (guard) setTimeout(() => run(() => explainReload(tabId)), RELOADED_NOTICE_MS);
+  }
+  if (p.reloadTabIds.length) scheduleRelease(await expire());
   return p;
 }
 
@@ -624,6 +698,14 @@ chrome.tabs.onReplaced.addListener((added, removed) => {
   });
 });
 
+// The popup answers for a guarded tab. Only Tab Chaperone's own pages may: a content script
+// has the same extension id, but runs in a web page.
+chrome.runtime.onMessage.addListener((msg, sender) => {
+  if (msg?.type !== 'guard-answer' || sender.tab || !sender.url?.startsWith(chrome.runtime.getURL(''))) return;
+  if (!Number.isInteger(msg.tabId) || !['site', 'release'].includes(msg.choice)) return;
+  run(() => answerGuard(msg.tabId, msg.choice));
+});
+
 // The detector found a sensitive field.
 chrome.runtime.onMessage.addListener((msg, sender) => {
   if (msg?.type !== 'sensitive-field' || !sender.tab) return;
@@ -666,7 +748,7 @@ chrome.permissions.onRemoved.addListener(() => {
 
 // Scheduled checks and permission audits.
 chrome.alarms.onAlarm.addListener((alarm) => {
-  if ([CHECK_ALARM, AUDIT_ALARM, FAST_AUDIT_ALARM].includes(alarm.name)) requestCheck();
+  if ([CHECK_ALARM, AUDIT_ALARM, FAST_AUDIT_ALARM, RELEASE_ALARM].includes(alarm.name)) requestCheck();
 });
 
 // A click on a notification.
@@ -680,9 +762,10 @@ chrome.notifications.onClicked.addListener((id) => {
   }
 });
 // A click on a notification button.
-chrome.notifications.onButtonClicked.addListener((id) => {
+chrome.notifications.onButtonClicked.addListener((id, index) => {
   if (id === NOTIFY.intrusion) run(reloadAllProtectedTabs);
   if (id.startsWith(NOTIFY.frame)) run(() => reloadTab(Number(id.slice(NOTIFY.frame.length))));
+  if (id.startsWith(NOTIFY.reloaded)) run(() => answerGuard(Number(id.slice(NOTIFY.reloaded.length)), index === 0 ? 'site' : 'release'));
 });
 
 // A fresh install opens the welcome page, which explains what Tab Chaperone changes and asks

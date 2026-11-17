@@ -2,7 +2,7 @@
 import './chrome-stub.js';
 import { test, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { createTabTracker, ASK_NOTIFICATION } from '../lib/tabs.js';
+import { createTabTracker, ASK_NOTIFICATION, RELEASE_MS, GUARD_IDLE_MS } from '../lib/tabs.js';
 import { getTabData, setTabData, getAsks, getLog, normalizeSettings } from '../lib/storage.js';
 
 let notes;
@@ -127,4 +127,66 @@ test('a replaced tab keeps what was known, merged with the new tab', async () =>
   assert.deepEqual(await getTabData('flagged'), { 2: 'forum.com' });
   assert.deepEqual(await getTabData('loadTimes'), {}, 'unknown load time forces a reload');
   assert.equal(tracker.isFlaggedPage(2, 'https://forum.com/login'), true);
+});
+
+test('a guarded tab stays protected on its site until the login form is gone', async () => {
+  await tracker.flagTab({ id: 1, url: 'https://www.shop.com/deals' });
+  await tracker.guardTab(1, 'www.shop.com');
+  await tracker.forgetTab(1, 'https://www.shop.com/deals'); // the reload
+  assert.deepEqual(await getTabData('flagged'), { 1: 'www.shop.com' }, 'the reload keeps the flag');
+  await tracker.fieldsPresent(1); // you opened the login form again
+  assert.deepEqual(await getTabData('guarded'), { 1: { domain: 'shop.com', seen: true } });
+  assert.deepEqual(await getTabData('releases'), {});
+  await tracker.fieldsGone(1, 1000); // logged in: the form closed
+  assert.deepEqual(await getTabData('releases'), { 1: 1000 + RELEASE_MS });
+  assert.equal(await tracker.expire(1000), 1000 + RELEASE_MS, 'not yet');
+  assert.equal(await tracker.expire(1000 + RELEASE_MS), null);
+  assert.deepEqual(await getTabData('flagged'), {});
+  assert.deepEqual(await getTabData('guarded'), {});
+});
+
+test('a field that comes back in time cancels the release', async () => {
+  await tracker.flagTab({ id: 1, url: 'https://forum.com/login' });
+  await tracker.fieldsGone(1, 1000);
+  await tracker.fieldsPresent(1); // the next login step
+  assert.equal(await tracker.expire(1000 + RELEASE_MS), null);
+  assert.deepEqual(await getTabData('flagged'), { 1: 'forum.com' });
+});
+
+test('a guarded tab without a login form is released after the idle time', async () => {
+  await tracker.flagTab({ id: 1, url: 'https://shop.com/' });
+  await tracker.guardTab(1, 'shop.com');
+  const due = (await getTabData('releases'))[1];
+  assert.ok(due - Date.now() > GUARD_IDLE_MS - 1000);
+  await tracker.forgetTab(1, 'https://shop.com/item'); // browsing the site, no field seen yet
+  assert.equal((await getTabData('releases'))[1], due, 'browsing does not shorten the wait');
+  await tracker.expire(due);
+  assert.deepEqual(await getTabData('flagged'), {});
+});
+
+test('after logging in, a new page without a field releases the guarded tab', async () => {
+  await tracker.flagTab({ id: 1, url: 'https://shop.com/' });
+  await tracker.guardTab(1, 'shop.com');
+  await tracker.fieldsPresent(1);
+  await tracker.forgetTab(1, 'https://shop.com/account');
+  assert.deepEqual(await getTabData('flagged'), { 1: 'shop.com' });
+  assert.ok((await getTabData('releases'))[1] - Date.now() <= RELEASE_MS);
+});
+
+test('a guarded tab that goes to another site, or is closed, is forgotten', async () => {
+  await tracker.flagTab({ id: 1, url: 'https://shop.com/' });
+  await tracker.guardTab(1, 'shop.com');
+  await tracker.forgetTab(1, 'https://news.com/');
+  assert.deepEqual([await getTabData('flagged'), await getTabData('guarded'), await getTabData('releases')], [{}, {}, {}]);
+  await tracker.flagTab({ id: 2, url: 'https://shop.com/' });
+  await tracker.guardTab(2, 'shop.com');
+  await tracker.forgetTab(2);
+  assert.deepEqual([await getTabData('flagged'), await getTabData('guarded'), await getTabData('releases')], [{}, {}, {}]);
+});
+
+test('"Turn extensions back on" releases the tab at once', async () => {
+  await tracker.flagTab({ id: 1, url: 'https://shop.com/' });
+  await tracker.guardTab(1, 'shop.com');
+  await tracker.releaseTab(1);
+  assert.deepEqual([await getTabData('flagged'), await getTabData('guarded'), await getTabData('releases')], [{}, {}, {}]);
 });

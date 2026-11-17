@@ -4,7 +4,7 @@ import { describeTab, siteForTab, wholeSites } from './lib/planner.js';
 import { riskOf, permissionSnapshot } from './lib/risk.js';
 import {
   KEYS, getSettings, getState, isPaused, setPaused, pauseFor, getAlerts, getFlaggedTabs, getFramedTabs, actions,
-  getAsks, openAsks, hasConsent,
+  getAsks, openAsks, hasConsent, getTabData,
 } from './lib/storage.js';
 import { el, readDomain, onStorageChange } from './lib/ui.js';
 import { levelPicker, askCard, foldedAsk, clearAsksButton, levelsFor } from './lib/levels.js';
@@ -54,8 +54,18 @@ function renderAsks(asks, settings) {
   askEl.hidden = !askEl.childElementCount;
 }
 
+// The tab was reloaded because of a detected field and stays protected until you have logged in.
+function guardCard(guard) {
+  const answer = (choice) => chrome.runtime.sendMessage({ type: 'guard-answer', tabId: tab.id, choice });
+  return el('div', { className: 'ask-card' },
+    el('p', { textContent: t(guard.seen ? 'guardStatusLogin' : 'guardStatus', { site: guard.domain }) }),
+    el('div', { className: 'ask-actions' },
+      el('button', { textContent: t('guardProtectSite'), onclick: () => answer('site') }),
+      el('button', { className: 'secondary', textContent: t('guardRelease'), onclick: () => answer('release') })));
+}
+
 // The current tab: its protection, its level, or a form to protect it.
-function renderSite(settings, flaggedTabs) {
+function renderSite(settings, flaggedTabs, guard) {
   const { host, site, exclusion, detected } = describeTab(tab?.url, tab?.id, settings, flaggedTabs);
   siteEl.replaceChildren();
   if (!host) {
@@ -63,6 +73,7 @@ function renderSite(settings, flaggedTabs) {
     return;
   }
   siteEl.append(el('p', { className: 'host', textContent: host }));
+  if (guard) siteEl.append(guardCard(guard));
 
   if (site) {
     const status = site.level !== 'login'
@@ -184,9 +195,10 @@ async function render() {
   const [settings, state, paused, exts, flaggedTabs, alerts, asks, consent] = await Promise.all([
     getSettings(), getState(), isPaused(), chrome.management.getAll(), getFlaggedTabs(), getAlerts(), getAsks(), hasConsent(),
   ]);
+  const guard = (await getTabData('guarded'))[tab?.id];
   renderWarnings(alerts, consent);
   renderAsks(asks, settings);
-  renderSite(settings, flaggedTabs);
+  renderSite(settings, flaggedTabs, guard);
   renderStatus(paused, state, new Map(exts.map((e) => [e.id, e])));
 }
 
@@ -198,6 +210,6 @@ document.getElementById('open-options').addEventListener('click', (e) => {
   e.preventDefault();
   chrome.runtime.openOptionsPage();
 });
-onStorageChange([KEYS.settings, KEYS.state, KEYS.paused, KEYS.flaggedTabs, KEYS.alerts, KEYS.asks, KEYS.consent], render);
+onStorageChange([KEYS.settings, KEYS.state, KEYS.paused, KEYS.flaggedTabs, KEYS.guardedTabs, KEYS.alerts, KEYS.asks, KEYS.consent], render);
 
 render();

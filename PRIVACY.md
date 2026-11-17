@@ -8,7 +8,7 @@ Tab Chaperone is a Chrome extension. Sander Tamaela develops and publishes it as
 
 - The addresses of your open tabs and the pages they load. Tab Chaperone compares them with the sites you protect.
 - The list of your installed extensions with their names and permissions. Tab Chaperone turns them off and on and shows their risk.
-- With automatic protection turned on, whether a page has a password, code or payment field. The detector reports only that such a field exists. It does not read what you type or what the page shows.
+- With automatic protection turned on, whether a page has a password, code or payment field. The detector reports only that such a field exists and when it is gone. It does not read what you type or what the page shows.
 
 ## What Tab Chaperone stores
 
